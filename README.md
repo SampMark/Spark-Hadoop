@@ -29,8 +29,9 @@ O objetivo é oferecer um ambiente “_all-in-one_” para pesquisas e testes de
 
 ---
 
-## 📂 Estrutura de Diretórios
+## 📂 Estrutura de diretórios
 
+´´´
 spark-hadoop/
 ├── .dockerignore
 ├── .env
@@ -82,7 +83,7 @@ spark-hadoop/
 └── tests/
     ├── smoke_test_hadoop.sh
     └── smoke_test_spark.sh
-
+´´´
 ---
 
 ## 🚀 Quick Start
