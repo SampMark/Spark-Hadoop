@@ -1,0 +1,16 @@
+# Variáveis de ambiente
+.env
+
+# Artefatos de build/pacotes
+docker/hadoop/
+docker/spark/
+config_processed/
+docker-compose.yml
+
+# Logs e caches
+*.log
+*.tmp
+*.swp
+
+# Tests logs
+tests/*.log

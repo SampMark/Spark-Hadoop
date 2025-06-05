@@ -1,0 +1,389 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+
+<!--
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License. See accompanying LICENSE file.
+-->
+
+<configuration>
+    <!--
+        yarn-site.xml contém parâmetros de configuração para o YARN (Yet Another Resource Negotiator),
+        incluindo o ResourceManager, NodeManagers, e como os recursos são gerenciados.
+    -->
+
+    <!-- Configurações de Recursos do NodeManager -->
+    <property>
+        <name>yarn.nodemanager.resource.memory-mb</name>
+        <value>4096</value> <!-- 4GB -->
+        <description>
+            A quantidade total de memória física (em MB) que o NodeManager pode alocar
+            para todos os contêineres em execução nesse nó.
+            Este valor deve ser menor que a memória física total do nó, reservando
+            espaço para o sistema operacional e outros processos (incluindo os daemons do Hadoop/Spark).
+            Para um nó com 8GB de RAM, 4GB-6GB para contêineres YARN pode ser um bom começo.
+            Ajuste conforme os recursos totais dos seus nós workers.
+        </description>
+    </property>
+
+    <property>
+        <name>yarn.nodemanager.resource.cpu-vcores</name>
+        <value>4</value> <!-- Exemplo: se o nó worker tiver 4-8 vCPUs físicas/virtuais -->
+        <description>
+            O número total de vCores (núcleos virtuais de CPU) que o NodeManager
+            pode alocar para todos os contêineres nesse nó.
+            Este valor deve ser igual ou menor que o número de cores disponíveis no nó worker.
+            Ajuste conforme os recursos de CPU dos seus nós workers.
+        </description>
+    </property>
+
+    <!-- Configurações de Alocação do Scheduler (ResourceManager) -->
+    <property>
+        <name>yarn.scheduler.minimum-allocation-mb</name>
+        <value>512</value> <!-- Padrão Hadoop 3.x é geralmente 1024, mas o original era 1024 -->
+                            <!-- <value>1024</value> --> <!-- Valor Original -->
+        <description>
+            A alocação mínima de memória (em MB) para um contêiner.
+            Requisições de memória menores que este valor serão arredondadas para este valor.
+            O padrão do Hadoop 3.x é tipicamente 1024MB. O arquivo original tinha 1024MB.
+            Um valor de 512MB pode ser aceitável para ambientes com recursos limitados ou
+            tarefas muito pequenas, mas 1024MB é um bom ponto de partida geral.
+            Este valor também influencia o arredondamento de `yarn.nodemanager.resource.memory-mb`.
+        </description>
+    </property>
+
+    <property>
+        <name>yarn.scheduler.maximum-allocation-mb</name>
+        <value>3072</value> <!-- Ex: 3GB, deve ser <= yarn.nodemanager.resource.memory-mb -->
+        <description>
+            A alocação máxima de memória (em MB) para um único contêiner.
+            Nenhuma aplicação pode requisitar um contêiner maior que este valor.
+            Deve ser menor ou igual a `yarn.nodemanager.resource.memory-mb`.
+            O valor de 3072MB é razoável se `yarn.nodemanager.resource.memory-mb` for 4096MB.
+        </description>
+    </property>
+
+    <property>
+        <name>yarn.scheduler.minimum-allocation-vcores</name>
+        <value>1</value>
+        <description>
+            A alocação mínima de vCores para um contêiner. Padrão é 1.
+        </description>
+    </property>
+
+    <property>
+        <name>yarn.scheduler.maximum-allocation-vcores</name>
+        <value>2</value> <!-- Exemplo: se yarn.nodemanager.resource.cpu-vcores for 4 -->
+        <description>
+            A alocação máxima de vCores para um único contêiner.
+            Deve ser menor ou igual a `yarn.nodemanager.resource.cpu-vcores`.
+        </description>
+    </property>
+
+    <!-- Configurações do ResourceManager -->
+    <property>
+        <name>yarn.resourcemanager.hostname</name>
+        <value>spark-master</value>
+        <description>
+            O hostname (ou alias do contêiner Docker) onde o ResourceManager (RM) está executando.
+            Esta é uma configuração CRUCIAL para que os NodeManagers e clientes saibam onde encontrar o RM.
+        </description>
+    </property>
+
+    <property>
+        <name>yarn.resourcemanager.bind-host</name>
+        <value>0.0.0.0</value>
+        <description>
+            O endereço IP real ao qual os servidores do ResourceManager (Scheduler, ApplicationMasterService, etc.)
+            farão bind. '0.0.0.0' significa que o RM escutará em todas as interfaces de rede disponíveis
+            na máquina do RM, o que é útil em contêineres para acessibilidade.
+        </description>
+    </property>
+
+    <!-- Configurações de Scheduler (Exemplo para Capacity Scheduler, que é comum) -->
+    <!-- O Capacity Scheduler é frequentemente o padrão. Se usar Fair Scheduler, as configs são diferentes. -->
+    <property>
+        <name>yarn.scheduler.capacity.root.queues</name>
+        <value>default,spark</value> <!-- Exemplo de filas: 'default' e uma específica para 'spark' -->
+        <description>
+            Lista de filas de primeiro nível sob a raiz (root) para o Capacity Scheduler.
+            Exemplo: uma fila 'default' e uma fila 'spark'.
+            A configuração de filas é complexa e depende dos requisitos de multi-tenancy.
+            Para um setup simples, uma única fila 'default' com 100% da capacidade é suficiente.
+        </description>
+    </property>
+
+    <property>
+        <name>yarn.scheduler.capacity.root.default.capacity</name>
+        <value>50</value> <!-- Ex: 50% da capacidade do cluster para a fila 'default' -->
+        <description>
+            Capacidade da fila 'default' como uma porcentagem da capacidade do pai (root).
+        </description>
+    </property>
+    <property>
+        <name>yarn.scheduler.capacity.root.default.maximum-capacity</name>
+        <value>100</value>
+         <description>
+            Capacidade máxima que a fila 'default' pode usar (elasticidade).
+        </description>
+    </property>
+     <property>
+        <name>yarn.scheduler.capacity.root.default.user-limit-factor</name>
+        <value>1</value>
+         <description>
+            Fator que limita os recursos por usuário na fila 'default'. 1 significa que um único usuário
+            pode usar toda a capacidade da fila.
+        </description>
+    </property>
+    <property>
+        <name>yarn.scheduler.capacity.root.default.state</name>
+        <value>RUNNING</value>
+        <description>Estado da fila 'default' (RUNNING ou STOPPED).</description>
+    </property>
+
+    <property>
+        <name>yarn.scheduler.capacity.root.spark.capacity</name>
+        <value>50</value> <!-- Ex: 50% da capacidade do cluster para a fila 'spark' -->
+        <description>
+            Capacidade da fila 'spark' como uma porcentagem da capacidade do pai (root).
+        </description>
+    </property>
+    <property>
+        <name>yarn.scheduler.capacity.root.spark.maximum-capacity</name>
+        <value>100</value>
+         <description>
+            Capacidade máxima que a fila 'spark' pode usar.
+        </description>
+    </property>
+    <property>
+        <name>yarn.scheduler.capacity.root.spark.user-limit-factor</name>
+        <value>1</value>
+        <description>Fator de limite de usuário para a fila 'spark'.</description>
+    </property>
+    <property>
+        <name>yarn.scheduler.capacity.root.spark.state</name>
+        <value>RUNNING</value>
+        <description>Estado da fila 'spark'.</description>
+    </property>
+
+    <property>
+        <name>yarn.scheduler.capacity.maximum-am-resource-percent</name>
+        <value>0.2</value> <!-- Padrão é 0.1 (10%). Original era 0.4 -->
+        <description>
+            Percentual máximo de recursos do cluster que pode ser usado para executar
+            ApplicationMasters. Controla o número de aplicações ativas concorrentes.
+            O valor original de 0.4 (40%) é bastante alto e pode limitar os recursos
+            disponíveis para tarefas se muitas AMs estiverem ativas.
+            Um valor entre 0.1 (10%) e 0.2 (20%) é mais comum. Ajuste conforme a necessidade.
+        </description>
+    </property>
+
+    <!-- Serviços Auxiliares do NodeManager -->
+    <property>
+        <name>yarn.nodemanager.aux-services</name>
+        <value>mapreduce_shuffle,spark_shuffle</value>
+        <description>
+            Serviços auxiliares a serem executados nos NodeManagers.
+            'mapreduce_shuffle' é necessário para jobs MapReduce.
+            'spark_shuffle' é o serviço de shuffle externo do Spark, recomendado para
+            melhor desempenho e estabilidade de jobs Spark com shuffle intensivo.
+            Se você não usa Spark ou usa o shuffle interno do Spark, 'spark_shuffle' pode ser omitido.
+        </description>
+    </property>
+
+    <property>
+        <name>yarn.nodemanager.aux-services.mapreduce_shuffle.class</name>
+        <value>org.apache.hadoop.mapred.ShuffleHandler</value>
+        <description>Classe para o serviço de shuffle do MapReduce.</description>
+    </property>
+
+    <property>
+        <name>yarn.nodemanager.aux-services.spark_shuffle.class</name>
+        <value>org.apache.spark.network.yarn.YarnShuffleService</value>
+        <description>
+            Classe para o serviço de shuffle externo do Spark.
+            Requer que o JAR do spark-network-yarn esteja no classpath do NodeManager
+            (geralmente via yarn.application.classpath ou copiando para HADOOP_YARN_HOME/lib).
+        </description>
+    </property>
+    <!-- Para o spark_shuffle funcionar, o Spark precisa ser configurado para usá-lo -->
+    <!-- No spark-defaults.conf: spark.shuffle.service.enabled true -->
+
+    <!-- Agregação de Logs do YARN -->
+    <property>
+        <name>yarn.log-aggregation-enable</name>
+        <value>true</value>
+        <description>
+            Habilita a agregação de logs de contêineres.
+            Quando habilitado, os logs das aplicações são movidos para o HDFS (ou outro sistema de arquivos configurado)
+            após a conclusão da aplicação, tornando-os acessíveis centralmente. Essencial para depuração.
+        </description>
+    </property>
+
+    <property>
+        <name>yarn.nodemanager.remote-app-log-dir</name>
+        <value>/user/${user.name}/yarnLogs</value> <!-- Caminho HDFS mais específico para YARN -->
+        <!-- <value>/user/${user.name}/hadoopLogs</value> --> <!-- Valor Original -->
+        <description>
+            O diretório raiz no HDFS para onde os logs agregados das aplicações são movidos.
+            `${user.name}` será o usuário que submeteu a aplicação.
+            Recomenda-se um diretório específico para logs YARN, como `/user/${user.name}/yarnLogs` ou `/var/log/hadoop-yarn/apps`.
+            Este diretório deve existir no HDFS e ter permissões apropriadas.
+        </description>
+    </property>
+
+    <property>
+        <name>yarn.nodemanager.remote-app-log-dir-suffix</name>
+        <value>logs</value>
+        <description>
+            Um sufixo adicionado ao diretório de log da aplicação dentro de `yarn.nodemanager.remote-app-log-dir`.
+            Ex: /user/myuser/yarnLogs/application_1234_5678/logs
+        </description>
+    </property>
+
+    <property>
+        <name>yarn.log-aggregation.retain-seconds</name>
+        <value>604800</value> <!-- 7 dias -->
+        <description>
+            Tempo (em segundos) para reter os logs agregados no HDFS antes de serem excluídos.
+            604800 segundos = 7 dias. Ajuste conforme sua política de retenção de logs.
+            Um valor de -1 desabilita a exclusão.
+        </description>
+    </property>
+
+    <!-- O valor original para yarn.log-aggregation.check-interval-seconds era 60.
+         Esta propriedade foi removida em versões mais recentes do Hadoop (HADOOP-13494, Hadoop 3.0+).
+         A agregação de logs é agora geralmente tratada de forma diferente.
+    <property>
+        <name>yarn.log-aggregation.check-interval-seconds</name>
+        <value>60</value>
+        <description>How often to check for logs to aggregate. Default is 60 seconds.</description>
+    </property>
+    -->
+
+    <!-- Controle de Memória Virtual -->
+    <property>
+        <name>yarn.nodemanager.vmem-check-enabled</name>
+        <value>false</value>
+        <description>
+            Se o YARN deve impor limites de memória virtual (vmem) para contêineres.
+            O padrão é 'true' em algumas versões, mas frequentemente desabilitado ('false')
+            porque o cálculo de vmem pode ser impreciso e levar à terminação desnecessária de contêineres.
+            A monitoração da memória física (`yarn.nodemanager.pmem-check-enabled`, geralmente true por padrão)
+            é mais comum e confiável. Manter como 'false' é uma prática comum, a menos que você
+            tenha uma razão específica para habilitar a verificação de vmem.
+        </description>
+    </property>
+
+    <property>
+        <name>yarn.nodemanager.pmem-check-enabled</name>
+        <value>true</value>
+        <description>
+            Se o YARN deve impor limites de memória física (pmem) para contêineres.
+            Padrão é 'true'. É recomendado manter habilitado para evitar que contêineres
+            excedam a memória física alocada.
+        </description>
+    </property>
+
+    <!-- Classpath para Aplicações YARN -->
+    <property>
+        <name>yarn.application.classpath</name>
+        <!-- O classpath padrão do YARN é geralmente suficiente. Pode ser necessário adicionar JARs específicos. -->
+        <value>
+            ${HADOOP_CONF_DIR},
+            ${HADOOP_COMMON_HOME}/share/hadoop/common/*,${HADOOP_COMMON_HOME}/share/hadoop/common/lib/*,
+            ${HADOOP_HDFS_HOME}/share/hadoop/hdfs/*,${HADOOP_HDFS_HOME}/share/hadoop/hdfs/lib/*,
+            ${HADOOP_YARN_HOME}/share/hadoop/yarn/*,${HADOOP_YARN_HOME}/share/hadoop/yarn/lib/*
+            <!-- ${HADOOP_MAPRED_HOME}/share/hadoop/mapreduce/*,${HADOOP_MAPRED_HOME}/share/hadoop/mapreduce/lib/*, --> <!-- Para MapReduce clássico -->
+            <!-- ${SPARK_HOME}/jars/*, --> <!-- Se Spark não usar seu próprio mecanismo de distribuição de JARs via YARN -->
+            <!-- O valor original incluía ${SPARK_HOME}/yarn/* que é para o shuffle service e não para o classpath da aplicação em si -->
+        </value>
+        <description>
+            Classpath usado por aplicações rodando no YARN (ApplicationMasters e contêineres).
+            As variáveis como ${HADOOP_COMMON_HOME} são expandidas nos NodeManagers.
+            O valor original era extenso e incluía ${SPARK_HOME}/yarn/*, que é mais para o
+            serviço de shuffle do Spark e não necessariamente para o classpath de todas as aplicações.
+            Simplificado para incluir os componentes Hadoop padrão. Se o Spark for executado no YARN,
+            ele geralmente gerencia seus próprios JARs. Se JARs específicos do Spark fossem necessários
+            globalmente, `${SPARK_HOME}/jars/*` seria mais apropriado do que `${SPARK_HOME}/yarn/*`.
+        </description>
+    </property>
+
+    <!-- Propriedades Adicionais Sugeridas para yarn-site.xml -->
+
+    <property>
+        <name>yarn.resourcemanager.scheduler.class</name>
+        <value>org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CapacityScheduler</value>
+        <!-- Ou org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.FairScheduler -->
+        <description>
+            A classe do scheduler a ser usada pelo ResourceManager.
+            As opções comuns são CapacityScheduler (frequentemente o padrão) ou FairScheduler.
+            A escolha depende dos seus requisitos de compartilhamento de recursos e multi-tenancy.
+            As propriedades `yarn.scheduler.capacity.*` acima são para o CapacityScheduler.
+        </description>
+    </property>
+
+    <property>
+        <name>yarn.nodemanager.disk-health-checker.enable</name>
+        <value>true</value>
+        <description>
+            Habilita o verificador de saúde de disco no NodeManager.
+            Se habilitado, o NodeManager monitora os diretórios locais (definidos em yarn.nodemanager.local-dirs
+            e yarn.nodemanager.log-dirs) e se um disco falhar, o NodeManager pode ser marcado como UNHEALTHY.
+        </description>
+    </property>
+
+    <property>
+        <name>yarn.nodemanager.local-dirs</name>
+        <value>/opt/hadoop_data/yarn/local</value> <!-- Deve ser um caminho em disco local rápido -->
+        <description>
+            Lista de diretórios no sistema de arquivos local a serem usados pelo NodeManager
+            para armazenar dados intermediários de aplicações (arquivos de shuffle, etc.).
+            Separados por vírgula se múltiplos diretórios/discos.
+            Estes diretórios devem ter bom desempenho de I/O.
+            Em Docker, mapear para volumes se a persistência/desempenho for crítica para certos tipos de shuffle.
+        </description>
+    </property>
+
+    <property>
+        <name>yarn.nodemanager.log-dirs</name>
+        <value>/opt/hadoop_data/yarn/logs</value> <!-- Diretório para logs de contêineres antes da agregação -->
+        <description>
+            Lista de diretórios no sistema de arquivos local a serem usados pelo NodeManager
+            para armazenar logs de contêineres antes de serem agregados (se a agregação estiver habilitada).
+            Separados por vírgula se múltiplos.
+        </description>
+    </property>
+
+    <!--
+    <property>
+        <name>yarn.timeline-service.enabled</name>
+        <value>true</value>
+        <description>
+            Habilita o YARN Timeline Service (ATS).
+            Necessário para armazenar informações genéricas sobre aplicações.
+            Pode ser ATS v1.x ou ATS v2, com configurações adicionais específicas para cada versão.
+        </description>
+    </property>
+
+    <property>
+        <name>yarn.timeline-service.hostname</name>
+        <value>spark-master</value>  <! -- Hostname onde o Timeline Server (ATS v1.x ou v2 Writer) está rodando -->
+        <description>
+            O hostname do YARN Timeline Server.
+        </description>
+    </property>
+    -->
+    <!-- Configurações adicionais para ATS (ex: yarn.timeline-service.address, .webapp.address, .store-class, etc.)
+         seriam necessárias dependendo da versão e do backend de armazenamento escolhido. -->
+
+</configuration>

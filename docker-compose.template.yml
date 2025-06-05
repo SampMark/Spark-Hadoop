@@ -1,0 +1,135 @@
+version: "3.8"
+
+services:
+  namenode:
+    container_name: "${STACK_NAME}_namenode_1"
+    hostname: "namenode"
+    build:
+      context: ./docker
+      args:
+        MY_USERNAME: "${MY_USERNAME}"
+    environment:
+      - MY_USERNAME=${MY_USERNAME}
+    volumes:
+      - namenode_data:/home/${MY_USERNAME}/hadoop/hdfs/namenode
+      - ./config_processed/hadoop:/home/${MY_USERNAME}/config/hadoop
+      - ./config_processed/system:/home/${MY_USERNAME}/config/system
+      - .env:/home/${MY_USERNAME}/.env:ro
+      - ./myfiles:/home/${MY_USERNAME}/myfiles
+    ports:
+      - "${HOST_HDFS_UI_PORT}:9870"
+      - "${HOST_YARN_UI_PORT}:8088"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9870/"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  resourcemanager:
+    depends_on:
+      - namenode
+    container_name: "${STACK_NAME}_resourcemanager_1"
+    hostname: "resourcemanager"
+    image: "${STACK_NAME}_namenode_1"
+    environment:
+      - MY_USERNAME=${MY_USERNAME}
+    volumes:
+      - ./config_processed/hadoop:/home/${MY_USERNAME}/config/hadoop
+      - .env:/home/${MY_USERNAME}/.env:ro
+    ports:
+      - "8088:8088"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8088/"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  spark-master:
+    depends_on:
+      - namenode
+      - resourcemanager
+    container_name: "${STACK_NAME}_spark-master_1"
+    hostname: "spark-master"
+    image: "${STACK_NAME}_namenode_1"
+    environment:
+      - MY_USERNAME=${MY_USERNAME}
+    volumes:
+      - spark_master_data:/home/${MY_USERNAME}/spark/logs
+      - ./config_processed/spark:/home/${MY_USERNAME}/config/spark
+      - .env:/home/${MY_USERNAME}/.env:ro
+      - ./myfiles:/home/${MY_USERNAME}/myfiles
+    ports:
+      - "${HOST_SPARK_UI_PORT}:7077"
+      - "${HOST_SPARK_HISTORY_UI_PORT}:18080"
+      - "${JUPYTER_PORT}:8888"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7077/"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  datanode:
+    depends_on:
+      - namenode
+    image: "${STACK_NAME}_namenode_1"
+    environment:
+      - MY_USERNAME=${MY_USERNAME}
+    deploy:
+      mode: replicated
+      replicas: ${NUM_WORKER_NODES}
+    volumes:
+      - datanode_data:/home/${MY_USERNAME}/hadoop/hdfs/datanode
+      - ./config_processed/hadoop:/home/${MY_USERNAME}/config/hadoop
+      - ./config_processed/system:/home/${MY_USERNAME}/config/system
+      - .env:/home/${MY_USERNAME}/.env:ro
+      - ./myfiles:/home/${MY_USERNAME}/myfiles
+    ports:
+      - "9864"  # HDFS DataNode UI
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9864/"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  nodemanager:
+    depends_on:
+      - namenode
+      - resourcemanager
+    image: "${STACK_NAME}_namenode_1"
+    environment:
+      - MY_USERNAME=${MY_USERNAME}
+    deploy:
+      mode: replicated
+      replicas: ${NUM_WORKER_NODES}
+    volumes:
+      - ./config_processed/hadoop:/home/${MY_USERNAME}/config/hadoop
+      - .env:/home/${MY_USERNAME}/.env:ro
+    healthcheck:
+      test: ["CMD", "bash", "-c", "yarn node -list | grep 'RUNNING'"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
+  spark-worker:
+    depends_on:
+      - spark-master
+    image: "${STACK_NAME}_namenode_1"
+    environment:
+      - MY_USERNAME=${MY_USERNAME}
+    deploy:
+      mode: replicated
+      replicas: ${NUM_WORKER_NODES}
+    volumes:
+      - ./config_processed/spark:/home/${MY_USERNAME}/config/spark
+      - .env:/home/${MY_USERNAME}/.env:ro
+      - ./myfiles:/home/${MY_USERNAME}/myfiles
+    healthcheck:
+      test: ["CMD", "bash", "-c", "curl -f http://spark-master:8080/"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  namenode_data:
+  datanode_data:
+  spark_master_data:

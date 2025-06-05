@@ -1,0 +1,10 @@
+.git
+.gitignore
+.dockerignore
+README.md
+CONTRIBUTING.md
+CHANGELOG.md
+tests/
+config_files/
+docker-compose.template.yml
+.env
