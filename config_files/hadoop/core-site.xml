@@ -22,12 +22,12 @@
 
     <property>
         <name>fs.defaultFS</name>
-        <value>hdfs://spark-master:9000</value>
+        <value>hdfs://${HDFS_NAMENODE_HOST}:9000</value>
         <description>
             O nome do sistema de arquivos padrão.
             Uma URI cujo esquema e autoridade determinam a implementação do FileSystem.
             O esquema 'hdfs' indica o Hadoop Distributed FileSystem.
-            'spark-master' é o hostname (ou alias do contêiner Docker) onde o NameNode está executando.
+            'spark-master' é o hostname (ou alias do contêiner Docker) onde o NameNode está sendo executado.
             '9000' é a porta padrão para o NameNode IPC.
             Esta é uma configuração CRUCIAL. Certifique-se que 'spark-master' seja resolvível
             por todos os nós do cluster.

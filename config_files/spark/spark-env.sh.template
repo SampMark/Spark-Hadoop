@@ -120,11 +120,15 @@ export SPARK_DRIVER_MEMORY="1g"      # Memória para o Driver Program
 
 # 5. SPARK_WORKER_CORES: Número total de cores que um Worker pode alocar para executores.
 #    Padrão: todos os cores disponíveis na máquina.
-# export SPARK_WORKER_CORES="4" # Exemplo
+export SPARK_WORKER_CORES=${SPARK_WORKER_CORES:-1} # Exemplo, se não definido, usa todos os cores disponíveis
 
 # 6. SPARK_WORKER_MEMORY: Memória total que um Worker pode alocar para executores.
 #    Ex: 1000m, 2g. Padrão: (RAM total - 1GB).
-# export SPARK_WORKER_MEMORY="4g" # Exemplo
+export SPARK_WORKER_MEMORY=${SPARK_WORKER_MEMORY:-1g} # Exemplo, se não definido, usa 1GB como padrão 
+#    Recomendado definir para um valor que permita múltiplos executores por Worker.
+#    Exemplo: se o Worker tiver 8GB de RAM, definir para 6g pode ser razoável.
+#    Isso permite que o Worker tenha memória suficiente para o próprio daemon e outros processos.
+#    Se estiver usando Docker, pode ser necessário ajustar isso com base nos limites de memória do contêiner.
 
 # 7. SPARK_WORKER_PORT: Porta para o Spark Worker.
 #    Padrão: gerada aleatoriamente.
