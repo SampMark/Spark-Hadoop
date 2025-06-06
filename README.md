@@ -31,7 +31,7 @@ O objetivo é oferecer um ambiente “_all-in-one_” para pesquisas e testes de
 
 ## 📂 Estrutura de diretórios
 
-´´´
+```
 spark-hadoop/
 ├── .dockerignore
 ├── .env
@@ -83,7 +83,8 @@ spark-hadoop/
 └── tests/
     ├── smoke_test_hadoop.sh
     └── smoke_test_spark.sh
-´´´
+```
+
 ---
 
 ## 🚀 Quick Start
@@ -92,6 +93,7 @@ spark-hadoop/
    ```bash
    git clone https://github.com/SampMark/hadoop_spark.git
    cd hadoop_spark
+   ```
 
 
 ## :page_facing_up: License
