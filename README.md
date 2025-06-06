@@ -153,6 +153,10 @@ docker compose logs -f spark-master
 ## 8. 🔗Referências e Documentação Oficial
 Para um entendimento mais profundo dos componentes, consulte a documentação oficial:
 
+* ZAHARIA, Matei _et al_. **Resilient Distributed Datasets: A Fault-Tolerant Abstraction for In-Memory Cluster Computing**. In: USENIX Symposium on Networked Systems Design and Implementation (NSDI), 9., 2012, San Jose, CA. Anais. Berkeley: USENIX Association, 2012. p. 1-14. Disponível em: [https://www.usenix.org/system/files/conference/nsdi12/nsdi12-final138.pdf](https://www.usenix.org/system/files/conference/nsdi12/nsdi12-final138.pdf) Acesso em: 01 Jun. 2025.
+
+* MCDONALD, Carol. **Introduction to Spark Processing**. In: MCDONALD, Carol. ACCELERATING APACHE SPARK 3: Leveraging NVIDIA GPUs to Power the Next Era of Analytics and Al. [S.l.]: NVIDIA, 2021. cap. 1, p. 12-30. Disponível em: [https://images.nvidia.com/aem-dam/Solutions/deep-learning/deep-learning-ai/solutions/Accelerating-Apache-Spark-3-08262021.pdf](https://images.nvidia.com/aem-dam/Solutions/deep-learning/deep-learning-ai/solutions/Accelerating-Apache-Spark-3-08262021.pdf) Acesso em: 03 Jun. 2025.
+
 * [Documentação do Apache Hadoop 3.x](https://hadoop.apache.org/docs/stable/)
 * [Documentação do Apache Spark 3.3.x](https://spark.apache.org/docs/3.3.4/)
 * [Documentação do Docker](https://docs.docker.com/)
@@ -167,6 +171,7 @@ Para um entendimento mais profundo dos componentes, consulte a documentação of
 spark-hadoop/
 ├── .dockerignore
 ├── .env
+├── .env.template
 ├── .gitattributes
 ├── .gitignore
 ├── .password

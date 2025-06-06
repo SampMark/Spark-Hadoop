@@ -1,6 +1,8 @@
+# A Docker-based development environment for Apache Spark and Hadoop
 spark-hadoop/
 ├── .dockerignore
 ├── .env
+├── .env.template
 ├── .gitattributes
 ├── .gitignore
 ├── .password

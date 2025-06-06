@@ -92,7 +92,7 @@ log_info "Spark Version: ${SPARK_VERSION}"
 # --- Definição de Nomes de Arquivos e URLs ---
 # URLs base do Apache para downloads. Podem ser alteradas para mirrors, se necessário.
 APACHE_DOWNLOAD_BASE_URL="https://dlcdn.apache.org" # URL oficial de distribuição CDN do Apache
-APACHE_ARCHIVE_BASE_URL="https://archive.apache.org/dist" # URL de arquivamento, pode ser um fallback
+# APACHE_ARCHIVE_BASE_URL="https://archive.apache.org/dist" # URL de arquivamento, pode ser um fallback
 
 HADOOP_FILE="hadoop-${HADOOP_VERSION}.tar.gz"
 HADOOP_URL="${APACHE_DOWNLOAD_BASE_URL}/hadoop/core/hadoop-${HADOOP_VERSION}/${HADOOP_FILE}"
