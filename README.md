@@ -1,4 +1,4 @@
-# Spark e Hadoop Cluster Deployment
+# Implantação de clusters Spark-Hadoop (_Cluster Deployment_)
 
 ## 1. Visão Geral
 
@@ -31,7 +31,7 @@ O objetivo é oferecer um ambiente “_all-in-one_” para pesquisas e testes de
 
 ## 📂 Estrutura de diretórios
 
-´´´
+```
 spark-hadoop/
 ├── .dockerignore
 ├── .env
@@ -83,7 +83,8 @@ spark-hadoop/
 └── tests/
     ├── smoke_test_hadoop.sh
     └── smoke_test_spark.sh
-´´´
+```
+
 ---
 
 ## 🚀 Quick Start
@@ -92,12 +93,12 @@ spark-hadoop/
    ```bash
    git clone https://github.com/SampMark/hadoop_spark.git
    cd hadoop_spark
+   ```
+---
 
+## :page_facing_up: Licenças
 
-## :page_facing_up: License
+- `Apache Spark` e `Apache Hadoop` são software livre e de código aberto, licenciados sob a [Apache License](https://github.com/cmdviegas/docker-hadoop-cluster/blob/master/LICENSE.apache).
 
-`Apache Spark` e `Apache Hadoop` são software livre e de código aberto, licenciados sob a [Apache License](https://github.com/cmdviegas/docker-hadoop-cluster/blob/master/LICENSE.apache) and are also free, open-source software.
-
-
-Este script é um software livre e de código aberto, licenciado sob [MIT License](https://github.com/cmdviegas/docker-hadoop-cluster/blob/master/LICENSE).
+- Este script é um software livre e de código aberto, licenciado sob [MIT License](https://github.com/cmdviegas/docker-hadoop-cluster/blob/master/LICENSE).
 
