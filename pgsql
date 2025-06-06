@@ -1,7 +1,6 @@
 spark-hadoop/
 ├── .dockerignore
 ├── .env
-├── .env.example
 ├── .gitattributes
 ├── .gitignore
 ├── .password

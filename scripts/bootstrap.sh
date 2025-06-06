@@ -137,6 +137,24 @@ else
     log_warn "${HOME}/.bashrc não encontrado. Variáveis de ambiente importantes podem não estar definidas."
 fi
 
+# Validação de variáveis para envsubst:
+: "${HADOOP_NAMENODE_HOST:?HADOOP_NAMENODE_HOST não definido.}"
+: "${DFS_REPLICATION:?DFS_REPLICATION não definido.}"
+
+# --- Gerar core-site.xml a partir do template ---
+# Garantir que exista o arquivo template:
+TEMPLATE_CORE="${PWD}/config_files/hadoop/core-site.xml.tpl"  # ajuste se necessário
+TARGET_CORE_XML="${HADOOP_CONF_DIR}/core-site.xml"
+
+if [ ! -f "${TEMPLATE_CORE}" ]; then
+    log_error "Template '${TEMPLATE_CORE}' não encontrado. Não é possível gerar core-site.xml"
+fi
+
+log_info "Gerando '${TARGET_CORE_XML}' a partir de '${TEMPLATE_CORE}'..."
+envsubst < "${TEMPLATE_CORE}" > "${TARGET_CORE_XML}"
+log_info "'core-site.xml' gerado com sucesso em '${TARGET_CORE_XML}'."
+
+
 # --- Configuração da Senha do Usuário ---
 # Define a senha para o usuário 'myuser' (ou o usuário que executa os processos Hadoop/Spark).
 # Assume que o script está rodando como root ou tem permissões sudo.

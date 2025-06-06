@@ -35,6 +35,17 @@
     </property>
 
     <property>
+        <name>dfs.replication</name>
+        <value>${DFS_REPLICATION}</value>
+        <description>
+            O fator de replicação padrão para novos arquivos no HDFS.
+            ${DFS_REPLICATION} deve ser definido como uma variável de ambiente ou substituído
+            por um valor numérico (ex: 3) antes de iniciar o Hadoop.
+            Um fator de replicação de 3 é comum em ambientes de produção para garantir
+            resiliência e disponibilidade, mas pode ser ajustado conforme necessário.
+    </property>
+
+    <property>
         <name>hadoop.http.staticuser.user</name>
         <value>myuser</value>
         <description>
