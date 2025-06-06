@@ -26,6 +26,8 @@ A **arquitetura padrão** consiste em:
    - YARN NodeManager  
    - Spark Worker (o número de workers é facilmente configurável).
 
+---
+
 ## 2. Pré-requisitos
 Antes de começar, certifique-se de que você tem os seguintes softwares instalados e funcionando em sua máquina:
 
@@ -33,7 +35,9 @@ Antes de começar, certifique-se de que você tem os seguintes softwares instala
 - Docker Compose: Versão V2 (docker compose) é recomendada.
 - Portas Livres: Verifique se as portas padrão (ex: 8088, 9870, 8888, 18080) não estão em uso por outras aplicações.
 
-## 3. 🚀Início Rápido
+---
+
+## 3. ✨Início Rápido
 Siga estes passos para colocar seu cluster no ar em poucos minutos.
 
 **Passo 1: Clonar o Repositório**
@@ -53,24 +57,25 @@ docker compose up -d --build
 
 O primeiro início pode demorar alguns minutos, pois o Docker irá baixar as imagens base e as distribuições do Hadoop e Spark. Após a conclusão, seu cluster estará pronto para uso!
 
+---
+
 ## 4. Customização do Ambiente (arquivo `.env`)
 A principal forma de customizar o cluster (número de workers, versões, alocação de memória, etc.) é através do arquivo .env. Isso evita a necessidade de editar manualmente os arquivos XML ou scripts.
 
 Abaixo estão as variáveis mais importantes que você pode ajustar:
 
-|
-
-| Variável | Padrão (.env.example) | Descrição |
-| SPARK_WORKER_INSTANCES | 2 | O número de nós workers (DataNodes/NodeManagers) a serem criados no cluster. |
-| HADOOP_VERSION | 3.4.0 | A versão do Apache Hadoop a ser baixada e utilizada. |
-| SPARK_VERSION | 3.3.4 | A versão do Apache Spark a ser baixada e utilizada. |
-| HDFS_REPLICATION_FACTOR | 2 | O fator de replicação padrão do HDFS (dfs.replication). Deve ser ≤ ao número de workers. |
-| YARN_NODEMANAGER_MEMORY_MB | 4096 | Memória total (em MB) que cada NodeManager pode alocar para contêineres (yarn.nodemanager.resource.memory-mb). |
-| SPARK_DRIVER_MEMORY | 1g | Memória padrão para o Driver do Spark (spark.driver.memory). |
-| SPARK_EXECUTOR_MEMORY | 1536m | Memória padrão por Executor do Spark (spark.executor.memory). |
-| SPARK_EXECUTOR_CORES | 2 | Número de vCores padrão por Executor do Spark (spark.executor.cores). |
-| JUPYTERLAB_PORT | 8888 | Porta local que será mapeada para a interface do JupyterLab. |
-| SPARK_HISTORY_UI_PORT | 18080 | Porta local que será mapeada para a UI do Spark History Server. |
+| Variável                      | Padrão (.env)   | Descrição                                                                 |
+| :---------------------------- | :-------------: | :------------------------------------------------------------------------ |
+| `SPARK_WORKER_INSTANCES`      | `2`             | Número de nós workers (DataNodes/NodeManagers) a serem criados no cluster |
+| `HADOOP_VERSION`              | `3.4.0`         | Versão do Apache Hadoop a ser utilizada                                   |
+| `SPARK_VERSION`               | `3.3.4`         | Versão do Apache Spark a ser utilizada                                    |
+| `HDFS_REPLICATION_FACTOR`     | `2`             | Fator de replicação padrão do HDFS (`dfs.replication`). Deve ser ≤ número de workers |
+| `YARN_NODEMANAGER_MEMORY_MB`  | `4096`          | Memória total (MB) que cada NodeManager pode alocar para contêineres (`yarn.nodemanager.resource.memory-mb`) |
+| `SPARK_DRIVER_MEMORY`         | `1g`            | Memória padrão para o Driver do Spark (`spark.driver.memory`)             |
+| `SPARK_EXECUTOR_MEMORY`       | `1536m`         | Memória padrão por Executor do Spark (`spark.executor.memory`)            |
+| `SPARK_EXECUTOR_CORES`        | `2`             | Número de vCores por Executor do Spark (`spark.executor.cores`)           |
+| `JUPYTERLAB_PORT`             | `8888`          | Porta local mapeada para a interface do JupyterLab                        |
+| `SPARK_HISTORY_UI_PORT`       | `18080`         | Porta local mapeada para a UI do Spark History Server                     |
 
 **Importante**: caso altere o `.env`, pode ser necessário recriar os contêineres para que as mudanças tenham efeito: 
 ```
@@ -81,11 +86,14 @@ docker compose down && docker compose up -d
 ## 5. Acessando os Serviços e UIs Web
 Após iniciar o cluster, o usuário pode acessar as interfaces web dos diferentes serviços através do navegador.
 
-| Serviço | Porta (Local) | URL de Acesso | Descrição |
-| HDFS NameNode | 9870 | http://localhost:9870 | UI para monitorar o estado do HDFS. |
-| YARN ResourceManager | 8088 | http://localhost:8088 | UI para monitorar o cluster, filas e aplicações. |
-| Spark History Server | 18080 | http://localhost:18080 | UI para visualizar o histórico de aplicações Spark. |
-| JupyterLab | 8888 | http://localhost:8888 | Ambiente interativo para notebooks PySpark. |
+| Serviço              | Porta (Local) | URL de Acesso          | Descrição |
+| :------------------- | :-----------: | :--------------------: |-------------------------------------------------- |
+| HDFS NameNode        | 9870          | http://localhost:9870  | UI para monitorar o estado do HDFS.               |
+| YARN ResourceManager | 8088          | http://localhost:8088  | UI para monitorar o cluster, filas e aplicações.  |
+| Spark History Server | 18080         | http://localhost:18080 | UI para visualizar o histórico de aplicações Spark. |
+| JupyterLab           | 8888          | http://localhost:8888  | Ambiente interativo para notebooks PySpark.       |
+
+---
 
 ## 6. Exemplos práticos de uso
 O usuário pode interagir com o cluster executando comandos dentro do contêiner master ou submetendo jobs.
@@ -102,7 +110,6 @@ docker compose exec spark-master hdfs dfs -mkdir /meu-diretorio-teste
 # Copiar um arquivo local (do README.md) para o HDFS
 docker compose exec spark-master hdfs dfs -put README.md /meu-diretorio-teste
 ```
-
 #### 6.2. Submetendo um Job Spark (SparkPi)
 Execute o exemplo `SparkPi` para calcular o valor de Pi. Este job será submetido ao YARN.
 
@@ -115,8 +122,9 @@ docker compose exec spark-master spark-submit \
   --executor-memory 512m \
   $SPARK_HOME/examples/jars/spark-examples_*.jar 100
 ```
-
 Após a execução, o usuário verá o job concluído na UI do YARN (http://localhost:8088) e na UI do Spark History Server (http://localhost:18080).
+
+---
 
 ## 7. Gerenciando o Cluster
 Use os seguintes comandos `docker compose para gerenciar o ciclo de vida do seu cluster.
@@ -140,8 +148,9 @@ docker compose ps
 ```
 docker compose logs -f spark-master
 ```
+---
 
-8. Referências e Documentação Oficial
+## 8. 🔗Referências e Documentação Oficial
 Para um entendimento mais profundo dos componentes, consulte a documentação oficial:
 
 * [Documentação do Apache Hadoop 3.x](https://hadoop.apache.org/docs/stable/)
@@ -150,7 +159,9 @@ Para um entendimento mais profundo dos componentes, consulte a documentação of
 * [Documentação do Docker Compose](https://docs.docker.com/compose/)
 * [Repositório GitHub `haddop-spark` Prof. Carlos M. D. Viegas](https://github.com/cmdviegas/hadoop-spark)
 
-## 📂 9. Estrutura de diretórios
+---
+
+## 📂 9. Estrutura de diretórios e arquivos
 
 ```
 spark-hadoop/
@@ -204,10 +215,9 @@ spark-hadoop/
     ├── smoke_test_hadoop.sh
     └── smoke_test_spark.sh
 ```
-
 ---
 
-## 11. Licenças
+## 10. Licenças
 
 - `Apache Spark` e `Apache Hadoop` são software livre e de código aberto, licenciados sob a [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0).
 
