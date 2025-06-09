@@ -51,8 +51,9 @@ Siga estes passos para colocar seu cluster no ar em poucos minutos.
 Abra seu terminal e clone este repositório para sua máquina local.
 ```
 git clone https://github.com/SampMark/Spark-Hadoop.git
-cd spark_hadoop
+cd Spark-Hadoop
 ```
+
 **Passo 2: Construir e Iniciar o Cluster**
 Com o Docker em execução, execute o seguinte comando na raiz do projeto para construir as imagens e iniciar todos os serviços em background:
 ```
@@ -190,6 +191,7 @@ spark-hadoop/
 ├── LICENSE.mit                     ← MIT (scripts e infra)
 ├── pgsql
 ├── README.md
+├── requirements.txt
 ├── config_files/                   ← Contém os TEMPLATES de configuração.
 │   ├── README.md
 │   ├── hadoop/                     ← Templates para .xml.
