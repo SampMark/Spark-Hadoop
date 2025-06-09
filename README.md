@@ -2,38 +2,45 @@
 
 ## 1. Visão Geral
 
-O repositório **Spark-Hadoop** é projetado para provisionar, via Docker e Docker Compose, um cluster que combina o **Apache Spark** e **Apache Hadoop**, com integração ao **JupyterLab**.O objetivo é oferecer um ambiente “_all-in-one_” (completo e isolado) para estudos, desenvolvimento e testes de aplicações em Big Data, tornando simples os procedimentos de:
+Bem-vindo ao repositório **Spark-Hadoop**! Este projeto foi cuidadosamente construído para provisionar, de forma simples e rápida, um cluster completo que combina o poder do Apache Spark e do Apache Hadoop, via Docker, um cluster que combina o **Apache Spark** e **Apache Hadoop**, com integração ao **JupyterLab**. 
 
-1. Implantar clusters Spark + Hadoop em _containers_ isolados;
-2. Acessar a dashboards web (HDFS, YARN, Spark UI, JupyterLab) via mapeamento de portas;
-3. Rodar jobs MapReduce e Spark, inclusive com notebooks interativos.
+O objetivo é oferecer um ambiente “_all-in-one_”, isolado e pronto para uso, que abstrai a complexidade da configuração manual.  É a ferramenta interessante para estudantes, desenvolvedores e engenheiros de dados, no desenvolvimento e testes de aplicações em Big Data, tornando simples os procedimentos de:
 
+1. *Implantar clusters funcionais* de Spark e Hadoop em contêineres Docker isolados;
+2. *Aprendizado na prática*, acessando _dashboards web_ de todos os serviços (HDFS, YARN, Spark UI, JupyterLab) para entender como as peças se conectam;
+3. *Executar jobs de Big Data*, tanto no modelo clássico MapReduce do Hadoop quanto com o processamento em memória de alta performance do Spark.
+
+### **1.1. Arquitetura do Cluster**
 O ambiente Docker provisiona um cluster distribuído que combina:
-- **Apache Hadoop 3.4.x** (HDFS para armazenamento distribuído + YARN para gerenciamento de recursos).
-- **Apache Spark 3.3.x** (para processamento de dados em larga escala).
-- **JupyterLab** (para computação interativa com kernels PySpark).
 
-A **arquitetura padrão** consiste em:
-- 1 nó **master** executa os serviços centrais:
-   - HDFS NameNode  
-   - YARN ResourceManager  
-   - Spark Master  
-   - Spark History Server  
-   - JupyterLab
+- **Apache Hadoop 3.4.x**, fornece o HDFS (_Hadoop Distributed File System_) para armazenamento de dados massivos e tolerante a falhas, e o YARN (_Yet Another Resource Negotiator_) para um gerenciamento robusto dos recursos computacionais (CPU e memória) do(s) cluster(s).
+- **Apache Spark 4.0.x**, atua como o motor de processamento de dados em larga escala, executando tarefas sobre o YARN e lendo/escrevendo dados no HDFS.
+- **JupyterLab**, oferece um ambiente de notebook interativo, pré-configurado com um kernel `PySpark`, permitindo a análise de dados e o desenvolvimento de forma ágil e visual.
 
-- `N` nós **workers** (replicados dinamicamente), executam os serviços de dados e processamento:
-   - HDFS DataNode  
-   - YARN NodeManager  
-   - Spark Worker (o número de workers é facilmente configurável).
+A **arquitetura padrão** é composta por:
+- 1 **Nó Mestre** (`master`), orquestra o cluster, executando os serviços de gerenciamento:
+   - **HDFS NameNode**, é "cérebro" do HDFS, gerencia os metadados do sistema de arquivos.
+   - **YARN ResourceManager**, é o "chefe" do YARN, aloca recursos para as aplicações.
+   - **Spark History Server**, é uma UI web para visualizar o histórico de aplicações Spark concluídas.
+   - **JupyterLab**, servidor que fornece a interface de notebooks.
+
+- `N` **Nós de Trabalho** (`workers`), são os "operários" do cluster que podem ser replicados dinamicamente, executando as tarefas de armazenamento e processamento:
+   - **HDFS DataNode**, armazena os blocos de dados reais.  
+   - **YARN NodeManager**, gerencia os recursos de uma máquina individual e executa as tarefas.
+   - "Spark Worker", o número de `workers` é facilmente configurável em arquivo `.env`.
 
 ---
 
 ## 2. Pré-requisitos
-Antes de começar, certifique-se de que você tem os seguintes softwares instalados e funcionando em sua máquina:
+Antes de começar, certifique-se dos seguintes requisitos, softwares instalados e funcionando em sua máquina:
 
-- Docker Engine: Versão 20.10.0 ou superior.
-- Docker Compose: Versão V2 (docker compose) é recomendada.
-- Portas Livres: Verifique se as portas padrão (ex: 8088, 9870, 8888, 18080) não estão em uso por outras aplicações.
+- **Sistema Operacional**, preferencialmente, uma distribuição Linux (como Ubuntu ou CentOS).
+- **Java Development Kit (JDK)**, o Hadoop e o Spark rodam na JVM. É crucial instalar uma versão compatível (ex: JDK 11 para Hadoop 3.x). A variável de ambiente `JAVA_HOME` deve ser configurada e apontar para o diretório de instalação do Java.
+- **SSH (Secure Shell)**, essencial para que o nó mestre possa se comunicar e gerenciar os nós de trabalho sem a necessidade de senhas a cada comando. Isso é feito gerando um par de chaves SSH (`ssh-keygen`) e copiando a chave pública para o arquivo `authorized_keys` em todos os nós (inclusive no próprio mestre).
+- **Docker Engine** na versão 20.10.0 ou superior.
+- **Docker Compose** na versão V2 (`docker compose`), é fortemente recomendada.
+- **Recursos mínimos** de pelo menos 8 GB de RAM alocados para o Docker, para uma experiência fluida com 2 workers.
+- **Portas Livres**, verifique se as portas padrão (ex: 8088, 9870, 8888, 18080) não estão em uso por outras aplicações.
 
 ---
 
@@ -170,22 +177,22 @@ Para um entendimento mais profundo dos componentes, consulte a documentação of
 ```
 spark-hadoop/
 ├── .dockerignore
-├── .env
+├── .env                            ← Arquivo principal para customização do cluster.
 ├── .env.template
 ├── .gitattributes
 ├── .gitignore
 ├── .password
 ├── CHANGELOG.md
 ├── CONTRIBUTING.md
-├── docker-compose.template.yml
-├── docker-compose.yml      ← gerado por init.sh
-├── LICENSE.apache          ← Apache 2.0 (Hadoop)
-├── LICENSE.mit             ← MIT (scripts e infra)
+├── docker-compose.template.yml     ← Define os serviços (master, workers) e redes do Docker.
+├── docker-compose.yml              ← gerado por init.sh
+├── LICENSE.apache                  ← Apache 2.0 (Hadoop)
+├── LICENSE.mit                     ← MIT (scripts e infra)
 ├── pgsql
 ├── README.md
-├── config_files/
+├── config_files/                   ← Contém os TEMPLATES de configuração.
 │   ├── README.md
-│   ├── hadoop/
+│   ├── hadoop/                     ← Templates para .xml.
 │   │   ├── core-site.xml.template
 │   │   ├── hadoop-env.sh.template
 │   │   ├── hdfs-site.xml.template
@@ -207,14 +214,14 @@ spark-hadoop/
 │   └── entrypoint.sh
 ├── myfiles/
 │   ├── README.md
-│   ├── data/
-│   ├── notebooks/
-│   └── scripts/
+│   ├── data/                    ← Coloque seus datasets aqui.
+│   ├── notebooks/               ← Crie seus notebooks Jupyter aqui.
+│   └── scripts/                 ← Guarde seus scripts Python/Scala aqui.
 ├── scripts/
 │   ├── download_all.sh
 │   ├── init.sh
 │   ├── preflight_check.sh
-│   ├── bootstrap.sh
+│   ├── bootstrap.sh             ← Script interno que cuida da formatação do HDFS e da inicialização dos serviços.
 │   └── start_services.sh
 └── tests/
     ├── smoke_test_hadoop.sh
