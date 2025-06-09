@@ -1,0 +1,21 @@
+# requirements.txt
+# Este arquivo contém as dependências necessárias para o projeto.
+# As versões foram atualizadas para garantir compatibilidade e segurança.
+# As dependências foram organizadas para facilitar a manutenção e atualização.
+```
+    pandas==2.2.3
+    grpcio==1.68.1
+    grpcio-status
+    protobuf==5.28.3
+    graphframes
+    pyspark==3.5.5  # Use a variável ${SPARK_VERSION} ou um valor fixo
+    pyarrow==20.0.0
+    jupyterlab==4.4.2
+    ```
+    *Nota: A versão do `pyspark` deve corresponder à sua `SPARK_VERSION`.*
+
+Esta versão do `Dockerfile` é mais segura, eficiente, e totalmente integrada ao ecossistema de scripts e configurações que desenvolvidos.
+Funciona com o `docker-compose` e os scripts de inicialização, garantindo uma experiência de desenvolvimento e execução mais fluida para o cluster Hadoop e Spark.
+# O Dockerfile configura um ambiente para o cluster Hadoop e Spark, incluindo as dependências necessárias.
+# Foi otimizado para segurança, eficiência e integração com scripts de inicialização.
+# Assegura que o ambiente esteja pronto para uso com o `docker-compose`.
