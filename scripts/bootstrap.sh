@@ -8,7 +8,7 @@
 #   Hadoop, inicia o servidor SSH e, no caso do nó master, invoca o script
 #   'services.sh' para iniciar os daemons do Hadoop e Spark.
 #
-# Autor: Marcus V D Sampaio/Organização: IFRN] - Baseado no script original de Carlos M D Viegas
+# Autor: Marcus V D Sampaio/Organização: IFRN - Baseado no script de Carlos M D Viegas
 # Versão: 1.1
 # Data: 2024-05-07
 #
