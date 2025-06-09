@@ -43,8 +43,8 @@ Siga estes passos para colocar seu cluster no ar em poucos minutos.
 **Passo 1: Clonar o Repositório**
 Abra seu terminal e clone este repositório para sua máquina local.
 ```
-git clone https://github.com/SampMark/hadoop_spark.git
-cd hadoop_spark
+git clone https://github.com/SampMark/Spark-Hadoop.git
+cd spark_hadoop
 ```
 **Passo 2: Construir e Iniciar o Cluster**
 Com o Docker em execução, execute o seguinte comando na raiz do projeto para construir as imagens e iniciar todos os serviços em background:
