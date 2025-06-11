@@ -4,6 +4,9 @@
 ARG BASE_IMAGE=ubuntu:22.04
 FROM ${BASE_IMAGE}
 
+# Define a variável JAVA_VERSION com um valor padrão
+ARG JAVA_VERSION=11
+
 ARG MY_USERNAME
 ENV DEBIAN_FRONTEND=noninteractive
 

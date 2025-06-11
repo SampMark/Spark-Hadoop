@@ -1,12 +1,12 @@
-version: "3.8"
-
 services:
   namenode:
+    image: "${STACK_NAME}_namenode_1"
     env_file: .env
     container_name: "${STACK_NAME}_namenode_1"
     hostname: "namenode"
     build:
-      context: ./docker
+      context: .
+      dockerfile: ./docker/Dockerfile
       args:
         MY_USERNAME: "${MY_USERNAME}"
     environment:

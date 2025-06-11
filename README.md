@@ -54,8 +54,20 @@ git clone https://github.com/SampMark/Spark-Hadoop.git
 cd Spark-Hadoop
 ```
 
+Renomei os arquivos `.env.template` e `docker-compose.template.yml`
+
+```
+mv .env.template .env
+mv docker-compose.template.yml docker-compose.yml
+```
+
 **Passo 2: Construir e Iniciar o Cluster**
 Com o Docker em execução, execute o seguinte comando na raiz do projeto para construir as imagens e iniciar todos os serviços em background:
+```
+docker compose up
+```
+Opcionalmente:
+
 ```
 docker compose up -d --build
 ```
