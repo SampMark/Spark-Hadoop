@@ -14,6 +14,7 @@ spark-hadoop/
 ├── LICENSE.mit             ← MIT (scripts e infra)
 ├── pgsql
 ├── README.md
+├── requirements.txt
 ├── config_files/
 │   ├── README.md
 │   ├── hadoop/
