@@ -6,9 +6,13 @@ services:
     hostname: "namenode"
     build:
       context: .
-      dockerfile: ./docker/Dockerfile
+      dockerfile: /docker/Dockerfile
       args:
         MY_USERNAME: "${MY_USERNAME}"
+        # Usa 'myuser' como padrão se MY_GROUP não estiver no .env
+        MY_GROUP: "${MY_GROUP:-myuser}"
+        HADOOP_VERSION: "${HADOOP_VERSION}"
+        SPARK_VERSION: "${SPARK_VERSION}"
     environment:
       - MY_USERNAME=${MY_USERNAME}
     volumes:
