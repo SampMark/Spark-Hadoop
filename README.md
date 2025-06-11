@@ -1,6 +1,27 @@
-# Implantação de clusters Spark-Hadoop (_Cluster Deployment_) com ambiente Docker
+# Implantação de clusters Spark-Hadoop (_Cluster Deployment_) em ambiente Docker
 
-## 1. Visão Geral
+## Introdução
+
+O **Apache Hadoop** (versão 3.4.1) é um framework de código aberto para armazenamento e processamento distribuído de grandes conjuntos de dados, _Big Data_. A [**documentação oficial**](https://hadoop.apache.org/docs/current/) destaca a contínua evolução do Hadoop, com foco em melhorias de desempenho, novas funcionalidades e maior integração com ecossistemas de nuvem. O Hadoop é composto por três módulos:
+
+1. **Hadoop Distributed File System (HDFS)** é o sistema de arquivos distribuído do Hadoop, projetado para armazenar grandes volumes de dados em clusters de máquinas _commodity_. O HDFS oferece alta tolerância a falhas e alto _throughput_ de dados.
+2. **Yet Another Resource Negotiator (YARN)** é o framework de gerenciamento de recursos e agendamento de tarefas do Hadoop, sendo responsável por alocar recursos do sistema para as várias aplicações que rodam no cluster e por agendar as tarefas a serem executadas.
+3. **MapReduce** é um modelo de programação e um framework de software para escrever aplicações que processam grandes quantidades de dados em paralelo em grandes clusters.
+
+Por sua vez, o **Apache Spark** (versão 3.5.6) é um motor de análise unificado e de alta performance para processamento de dados em larga escala, de uso geral e acessível. Sua principal vantagem é a capacidade de realizar computação em memória, o que acelera significativamente o processamento em comparação com paradigmas baseados em disco como o **MapReduce**. Além disso, oferece APIs ricas e de alto nível em Java, Scala, Python e R, e um conjunto de ferramentas integradas para diversas tarefas de análise de dados.
+
+O poder do Spark reside em seus componentes bem integrados, que podem ser combinados para criar fluxos de trabalho de análise complexos:
+1. **Spark Core e RDDs** é a base de toda a plataforma. 
+   * **Resilient Distributed Datasets (RDDs)** é a abstração fundamental do Spark, uma coleção de elementos tolerante a falhas que pode ser operada em paralelo. Embora as APIs de alto nível como DataFrames sejam agora recomendadas, os RDDs ainda são uma parte crucial da base do Spark e oferecem controle de baixo nível quando necessário.
+   As transformações em RDDs (e DataFrames) são "preguiçosas" (_lazy evaluation_), o que significa que o Spark não calcula o resultado imediatamente. Em vez disso, ele constrói um grafo de execução (DAG) e só executa os cálculos quando uma ação (como coletar os resultados) é invocada, permitindo otimizações significativas.
+2. **Spark SQL é o módulo do Spark para trabalhar com dados estruturados - 'DataFrames' e 'Datasets', são a principal API para manipulação de dados. O Spark otimiza a execução por meio do [_Catalyst_](https://www.databricks.com/glossary/catalyst-optimizer).
+   * **Motor SQL distribuído** permite executar consultas SQL diretamente em DataFrames, podendo ler e escrever dados de uma variedade de fontes de dados estruturados, como JSON, Hive, Parquet e JDBC. 
+   * **Adaptive Query Execution (AQE**), é um framework que otimiza dinamicamente as consultas com base nas estatísticas de tempo de execução, ajustando o número de partições de _shuffle_ e otimizando junções (joins).
+3. **Structured Streaming** é o motor de processamento de stream tolerante a falhas e escalável do Spark, construído sobre a API do Spark SQL.
+4. **MLlib (Machine Learning Library)** é a biblioteca de aprendizado de máquina do Spark, projetada para ser escalável e fácil de usar.
+
+
+## 1. Visão Geral do Projeto
 
 Bem-vindo ao repositório **Spark-Hadoop**! Este projeto foi cuidadosamente construído para provisionar, de forma simples e rápida, um cluster completo que combina o poder do Apache Spark e do Apache Hadoop, via Docker, um cluster que combina o **Apache Spark** e **Apache Hadoop**, com integração ao **JupyterLab**. 
 
