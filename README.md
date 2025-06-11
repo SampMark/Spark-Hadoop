@@ -53,6 +53,7 @@ Abra seu terminal e clone este repositório para sua máquina local.
 git clone https://github.com/SampMark/Spark-Hadoop.git
 cd Spark-Hadoop
 ```
+
 **Passo 2: Construir e Iniciar o Cluster**
 Com o Docker em execução, execute o seguinte comando na raiz do projeto para construir as imagens e iniciar todos os serviços em background:
 ```
