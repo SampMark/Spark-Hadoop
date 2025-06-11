@@ -1,0 +1,43 @@
+# =============================================================================
+# Arquivo Docker Compose para Inicialização (compose-init.yml)
+#
+# Propósito:
+#   Este arquivo define APENAS o serviço 'init', que é responsável por
+#   gerar o arquivo principal 'docker-compose.yml' e baixar as dependências.
+#   Ele resolve o problema do "ovo e a galinha".
+#
+# Como Usar:
+#   docker compose -f compose-init.yml run --rm init
+# =============================================================================
+
+version: '3.8'
+
+services:
+  # O serviço 'init' é um contêiner temporário que executa o script de inicialização.
+  init:
+    # Usa uma imagem Alpine leve. O script 'download.sh' dentro dela irá instalar o 'aria2c'.
+    image: alpine:latest
+    container_name: ${STACK_NAME:-hadoop-spark-cluster}-init-runner
+    
+    # Define o diretório de trabalho dentro do contêiner.
+    working_dir: /workspace
+
+    # Monta o diretório atual do seu projeto (host) para dentro do contêiner.
+    # Isso permite que o script leia/escreva arquivos no seu projeto.
+    volumes:
+      - ./:/workspace
+
+    # Carrega as variáveis do seu arquivo .env para dentro do contêiner.
+    # Essencial para que o init.sh saiba o número de workers, versões, etc.
+    env_file:
+      - .env
+
+    # Define uma variável de ambiente específica para que o script saiba
+    # que está sendo executado corretamente via 'docker compose'.
+    environment:
+      - DOCKER_COMPOSE_RUN=true
+
+    # O comando que será executado quando o contêiner iniciar.
+    # Ele chama o script init.sh usando o shell 'sh' (disponível no Alpine).
+    command: ["sh", "scripts/init.sh"]
+

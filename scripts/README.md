@@ -2,18 +2,16 @@
 
 #### **Arquivos:**
 
-- `bootstrap.sh`: é executado em cada container (_master_ e _workers_), define `set -e` (erro aborta script), valida variáveis de ambiente, configura SSH, define senhas, atualiza lista de workers e, caso seja master, chama `services.sh`.
+- `init.sh`: gera dinamicamente o arquivo `docker-compose.yml` a partir de um modelo (`docker-compose.template.yml`), ajustando parâmetros como número de nós workers (variável `NUM_WORKER_NODES`), e aciona o download dos binários (`download_all.sh`).
 
-- `init.sh`: inicializa diretórios HDFS (`namenode`, `datanode`) e formata HDFS no master.
+- `download_all.sh`: baixa pacotes das distribuições do Hadoop, Spark e suas dependências (do S3 ou _mirror_) antes do _build_. Faz verificação de hash SHA512 para garantir integridade.
 
-- `preflight_check.sh`: Verifica pré-requisitos (ex.: variáveis de ambiente, conectividade, versões de Java etc.) antes de iniciar o cluster. Em cada checagem importante (p.ex., `command -v java` ou teste de conexão SSH) envia mensagem de erro e encerra imediatamente caso falhe.
+- `preflight_check.sh`: verifica pré-requisitos (ex.: variáveis de ambiente, conectividade, versões de Java etc.) antes de iniciar o cluster e valida as variáveis no arquivo `.env`, alertando para configurações ausentes ou inválidas antes de iniciar. Em cada checagem importante (p.ex., `command -v java` ou teste de conexão SSH) envia mensagem de erro e encerra imediatamente caso falhe.
 
+- `bootstrap.sh`: é executado dentro de cada contêiner no startup (_master_ e _workers_). Configura chaves SSH para comunicação entre nós, define senhas/usuários necessários, aplica ajustes no ambiente, e no nó master chama o script de inicialização dos serviços Hadoop/Spark. Atualiza lista de workers e, caso seja master, chama `services.sh`.
 
-- `services.sh`: inicia/para _daemons_ Hadoop (**NameNode**, **DataNode**, **ResourceManager**, **NodeManager**) e Spark (Master, Worker, History Server) no master.
+- `services.sh`:  orquestra (inicia/pára) todos _daemons_ Hadoop (**NameNode**, **DataNode**, **ResourceManager**, **NodeManager**) e Spark (Master, Worker, History Server) no master, isto é,gerencia todo o ciclo de vida dos daemons de um cluster Hadoop/Spark — incluindo HDFS, YARN, MapReduce History Server, Spark History Server, JupyterLab e (opcionalmente) Spark Connect. 
 
-- `start_services.sh`: chamado pelos _workers_ para iniciar serviços específicos (**DataNode**, **NodeManager**, **Spark Worker**).
-
-- `download_all.sh`: baixa pacotes do Hadoop, Spark e suas dependências (do S3 ou mirror) antes do _build_.
 
 #### Padrões de Codificação (_shell scripts_)
 

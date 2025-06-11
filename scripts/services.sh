@@ -5,7 +5,14 @@
 # Descrição:
 #   Este script gerencia o ciclo de vida (iniciar, parar, status, relatório)
 #   dos serviços individuais do cluster Hadoop, Spark e JupyterLab.
-#   É invocado pelo 'bootstrap.sh' no nó master.
+#   É o script necessário para orquestrar os daemons, sendo invocado pelo 'bootstrap.sh'.
+#
+# Funcionalidades:
+#   - Implementa a inicialização explícita e automática do Spark History Server.
+#   - Implementa a inicialização explícita e automática do JupyterLab em background.
+#   - Funções de `stop` e `status` atualizadas para incluir os novos serviços.
+#   - Lógica de inicialização do HDFS aprimorada para criar os diretórios de
+#     log do Spark, garantindo que o History Server funcione corretamente.
 #
 # Autor: Marcus V D Sampaio/Organização: IFRN] - Baseado no script original de Carlos M D Viegas
 # Versão: 1.1
@@ -48,9 +55,10 @@
 # -----------------------------------------------------------------------------
 
 # --- Configuração de Segurança e Comportamento do Shell ---
-set -euo pipefail # -e: exit on error, -u: unset vars are errors, -o pipefail: pipelines fail on first error
+# -e: exit on error, -u: unset vars are errors, -o pipefail: pipelines fail on first error
+set -euo pipefail
 
-# --- Definição de Cores e Funções de Logging (se não herdadas do bootstrap.sh) ---
+# --- Funções de Logging e Cores ---
 RED_COLOR='\033[0;31m'
 GREEN_COLOR='\033[0;32m'
 YELLOW_COLOR='\033[0;33m'
@@ -86,8 +94,12 @@ fi
 : "${HADOOP_CONF_DIR:?Variável HADOOP_CONF_DIR não definida.}"
 : "${JAVA_HOME:?Variável JAVA_HOME não definida.}"
 : "${HDFS_NAMENODE_USER:?Variável HDFS_NAMENODE_USER não definida.}"
+
 # SPARK_CONNECT_SERVER pode ser opcional ou ter um default
 SPARK_CONNECT_SERVER="${SPARK_CONNECT_SERVER:-disable}" # Default para 'disable' se não definida
+
+# Cria diretório de logs para Spark History e JupyterLab
+mkdir -p "${SPARK_HOME}/logs"
 
 # --- Estado Global de Boot ---
 # Usado para rastrear se a sequência de 'start all' foi bem-sucedida.
@@ -408,7 +420,9 @@ stop_mapred_history() {
     log_info "MapReduce Job History Server parado."
 }
 
+# =============================================================================
 # --- Gerenciamento do Spark History Server ---
+# =============================================================================
 start_spark_history() {
     log_info "Iniciando Spark History Server..."
 
@@ -429,15 +443,29 @@ start_spark_history() {
     fi
 
     # 3. Iniciar o servidor
+    # Ajustar diretório de event logs para o History Server
+    local event_log_dir
+    event_log_dir=$(grep -E '^spark\.eventLog\.dir' "${SPARK_HOME}/conf/spark-defaults.conf" \
+                    | awk '{print $2}') \
+                 || { log_error "spark.eventLog.dir não encontrado em spark-defaults.conf"; return 1; }
+    export SPARK_HISTORY_OPTS="-Dspark.history.fs.logDirectory=${event_log_dir}"
+    log_info "Spark History Server lerá logs de: ${event_log_dir}"
+
+    # Iniciar o servidor em background, registrando logs
     log_info "Iniciando daemon do Spark History Server (usando start-history-server.sh)..."
     if ! "${SPARK_HOME}/sbin/start-history-server.sh"; then
+    nohup "${SPARK_HOME}/sbin/start-history-server.sh" \
+        >> "${SPARK_HOME}/logs/history-server.out" 2>&1 &
+    sleep 2
+    if ! pgrep -f 'org.apache.spark.deploy.history.HistoryServer' > /dev/null; then
         log_error "Falha ao iniciar Spark History Server."
         return 1
     fi
     sleep 3
 
+    # Verificação final para garantir que o processo foi iniciado com sucesso
     if ! pgrep -f 'org.apache.spark.deploy.history.HistoryServer' > /dev/null; then
-        log_error "Spark History Server falhou ao iniciar (processo não encontrado)."
+        log_error "Falha ao iniciar o Spark History Server. Verifique os logs em ${SPARK_LOG_DIR}."
         return 1
     fi
     log_info "${GREEN_COLOR}Spark History Server iniciado com sucesso.${RESET_COLORS}"
@@ -451,7 +479,9 @@ stop_spark_history() {
     log_info "Spark History Server parado."
 }
 
+# =============================================================================
 # --- Gerenciamento do Jupyter Lab ---
+# =============================================================================
 start_jupyterlab() {
     local server_ip="0.0.0.0" # Escuta em todas as interfaces
     local port="${JUPYTER_PORT:-8888}" # Porta padrão 8888, configurável via .env

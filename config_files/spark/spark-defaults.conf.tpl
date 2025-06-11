@@ -62,7 +62,7 @@
 
 # Exemplo (do template original, para referência):
 # spark.master                             spark://master:7077
-# spark.eventLog.enabled                   true
+spark.eventLog.enabled                   true
 # spark.eventLog.dir                       hdfs://namenode:8021/directory
 # spark.serializer                         org.apache.spark.serializer.KryoSerializer
 # spark.driver.memory                      5g
