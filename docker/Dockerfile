@@ -158,7 +158,9 @@ RUN \
     ln -sf /usr/bin/python3.12 /usr/bin/python && \
     ln -sf /usr/bin/python3.12 /usr/bin/python3
 
-COPY requirements.txt /tmp/requirements.txt
+# Instala dependências necessárias para o projeto
+COPY ./requirements.txt /tmp/requirements.txt
+
 RUN \
     pip install --no-cache-dir --break-system-packages -q -r /tmp/requirements.txt && \
     rm /tmp/requirements.txt
@@ -172,7 +174,7 @@ RUN \
 
 WORKDIR ${MY_WORKDIR}
 
-# onsolida as instruções COPY para reduzir camadas.
+# Consolida as instruções COPY para reduzir camadas.
 # Copia binários preparados e depois todos os arquivos da aplicação.
 COPY --from=build-hadoop --chown=${MY_USERNAME}:${MY_GROUP} ${HADOOP_HOME} ${HADOOP_HOME}/
 COPY --from=build-spark --chown=${MY_USERNAME}:${MY_GROUP} ${SPARK_HOME} ${SPARK_HOME}/

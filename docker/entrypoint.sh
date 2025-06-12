@@ -3,47 +3,25 @@
 # Script de Ponto de Entrada (Entrypoint) para Contêiner Hadoop/Spark
 #
 # Descrição:
-#   Este script é o ponto de entrada principal para os contêineres Docker do
-#   cluster. Ele é executado como root e tem as seguintes responsabilidades:
-#   1. Carregar variáveis de ambiente de um arquivo .env, se existir.
-#   2. Validar a presença de variáveis de ambiente essenciais.
-#   3. Gerar dinamicamente arquivos de configuração (Hadoop XMLs, Spark .sh)
-#      a partir de templates, substituindo placeholders por variáveis de ambiente.
-#   4. Definir as permissões corretas para os arquivos e diretórios de
-#      configuração e dados.
-#   5. Executar o script principal da aplicação (bootstrap.sh), potencialmente
-#      mudando do usuário root para um usuário não privilegiado.
-#
+#   Este script, executado como root, prepara o ambiente do contêiner antes
+#   de entregar a execução ao processo principal.
+#   1. Valida variáveis de ambiente críticas.
+#   2. Gera arquivos de configuração a partir de templates.
+#   3. Cria e define permissões para diretórios de dados.
+#   4. Usa 'gosu' para mudar para um usuário não privilegiado e executar o
+#      script de bootstrap, garantindo a execução segura e o correto
+#      manuseio de sinais do sistema.
 # =============================================================================
 
 # --- Configuração de Segurança e Comportamento do Shell ---
-#     -e: Sai imediatamente se um comando falhar.
-#     -u: Trata variáveis não definidas como um erro.
-#     -o pipefail: Garante que o status de saída de um pipeline seja o do último comando que falhou.
+# -e: Sai imediatamente se um comando falhar.
+# -u: Trata variáveis não definidas como um erro.
+# -o pipefail: O status de saída de um pipeline é o do último comando que falhou.
 set -euo pipefail
 
-# --- Variáveis e Constantes ---
-# Usuário não-privilegiado que executará os processos Hadoop/Spark.
-# É esperado que esta variável seja passada para o contêiner Docker (ex: via docker-compose).
-# O default para 'hadoop' é uma convenção comum.
-readonly APP_USER="${MY_USERNAME:-hadoop}"
-# Grupo do usuário da aplicação. Padrão para o mesmo nome do usuário.
-readonly APP_GROUP="${MY_GROUP:-${APP_USER}}"
-
-# Diretórios de configuração
-readonly HADOOP_CONF_DIR_TEMPLATE="/config_files/hadoop" # Local dos templates
-readonly HADOOP_CONF_DIR="/etc/hadoop"                   # Destino final das configurações
-readonly SPARK_CONF_DIR_TEMPLATE="/config_files/spark"   # Local dos templates Spark
-# SPARK_HOME deve ser definido como uma variável de ambiente no Dockerfile ou docker-compose
-readonly SPARK_CONF_DIR="${SPARK_HOME}/conf"
-
-# Diretórios de dados (devem corresponder aos volumes montados e às configs nos XMLs)
-readonly HADOOP_DATA_DIRS="/opt/hadoop_data /var/log/hadoop /var/run/hadoop"
-
 # --- Funções de Logging ---
-# (Opcional, mas útil para logs mais claros)
 log_info() {
-    echo "[INFO] $(date '+%Y-%m-%d %H:%M:%S') - $1"
+    echo >&2 "[INFO] $(date '+%Y-%m-%d %H:%M:%S') - $1"
 }
 
 log_error() {
@@ -51,136 +29,107 @@ log_error() {
     exit 1
 }
 
-# --- Carregamento de Variáveis de Ambiente do .env ---
-# Embora a prática recomendada seja injetar variáveis através do Docker,
-# carregar um .env pode ser útil para desenvolvimento local ou configurações complexas.
-ENV_FILE="/home/${APP_USER}/.env"
-if [[ -f "${ENV_FILE}" ]]; then
-    log_info "Arquivo .env encontrado em ${ENV_FILE}. Carregando e exportando variáveis..."
-    # 'set -a' exporta todas as variáveis definidas no arquivo .env
-    # 'set +a' desativa este comportamento após o source
-    set -a
-    source "${ENV_FILE}"
-    set +a
-    log_info "Variáveis do .env carregadas."
-fi
-
-# --- Validação de Variáveis de Ambiente ---
+# --- Validação de Variáveis de Ambiente Essenciais ---
 log_info "Validando variáveis de ambiente essenciais..."
-: "${HADOOP_HOME:?A variável de ambiente HADOOP_HOME não está definida.}"
-: "${SPARK_HOME:?A variável de ambiente SPARK_HOME não está definida.}"
-: "${JAVA_HOME:?A variável de ambiente JAVA_HOME não está definida.}"
-: "${SPARK_MASTER_HOSTNAME:?A variável SPARK_MASTER_HOSTNAME não está definida. (Ex: spark-master)}"
-# Adicionar outras validações de variáveis críticas aqui.
+: "${MY_USERNAME:?A variável MY_USERNAME deve ser definida (ex: no .env).}"
+: "${HADOOP_HOME:?A variável HADOOP_HOME não está definida.}"
+: "${SPARK_HOME:?A variável SPARK_HOME não está definida.}"
+: "${JAVA_HOME:?A variável JAVA_HOME não está definida.}"
+: "${SPARK_MASTER_HOSTNAME:?A variável SPARK_MASTER_HOSTNAME não está definida.}"
+# Adicione outras validações críticas aqui se necessário (ex: STACK_NAME).
+
+# --- Definição de Variáveis e Constantes ---
+readonly APP_USER="${MY_USERNAME}"
+readonly APP_GROUP="${MY_GROUP:-${APP_USER}}"
+
+# CORREÇÃO: Caminhos de templates e de destino são agora baseados no diretório do usuário.
+# Isso está alinhado com o Dockerfile que copia os arquivos para o MY_WORKDIR.
+readonly TEMPLATE_DIR="/home/${APP_USER}/config_templates"
+readonly CONFIG_PROCESSED_DIR="/home/${APP_USER}/config_processed"
+
+readonly HADOOP_CONF_DIR="${CONFIG_PROCESSED_DIR}/hadoop"
+readonly SPARK_CONF_DIR="${CONFIG_PROCESSED_DIR}/spark"
 
 # --- Geração Dinâmica de Arquivos de Configuração ---
-log_info "Gerando arquivos de configuração a partir de templates..."
+log_info "Gerando arquivos de configuração em ${CONFIG_PROCESSED_DIR}..."
 
-# Função genérica para processar templates com envsubst
+# Função genérica e flexível para processar templates.
 process_templates() {
-    local template_dir="$1"
-    local output_dir="$2"
-    local file_extension="$3"
+    local template_subdir="$1" # ex: "hadoop" ou "spark"
+    local output_subdir="$2"
+    local extension="$3"       # ex: "xml" ou "sh"
 
-    if [ ! -d "${template_dir}" ]; then
-        log_info "Diretório de templates ${template_dir} não encontrado, pulando."
+    local input_dir="${TEMPLATE_DIR}/${template_subdir}"
+    local output_dir="${CONFIG_PROCESSED_DIR}/${output_subdir}"
+
+    if [[ ! -d "${input_dir}" ]]; then
+        log_info "Diretório de templates ${input_dir} não encontrado, pulando."
         return
     fi
+    mkdir -p "${output_dir}"
 
-    # Exporta variáveis que precisam ser substituídas nos templates
-    export SPARK_MASTER_HOSTNAME HADOOP_HOME SPARK_HOME JAVA_HOME APP_USER
-    # Adicione aqui outras variáveis que você usa em seus templates
+    # Exporta todas as variáveis de ambiente para que 'envsubst' possa usá-las.
+    # Esta é uma abordagem simples e robusta.
+    export HADOOP_HOME SPARK_HOME JAVA_HOME SPARK_MASTER_HOSTNAME MY_USERNAME
 
-    for template in "${template_dir}"/*."${file_extension}".template; do
-        if [ -f "$template" ]; then
-            filename=$(basename "${template}" .template)
-            destination="${output_dir}/${filename}"
-            log_info "Processando template '${template}' para gerar '${destination}'..."
-            envsubst < "${template}" > "${destination}"
-        fi
+    find "${input_dir}" -type f -name "*.${extension}.template" | while read -r template; do
+        filename=$(basename "${template}" .template)
+        destination="${output_dir}/${filename}"
+        log_info "Processando '${template}' -> '${destination}'"
+        envsubst < "${template}" > "${destination}"
     done
 }
 
-# Gera arquivos de configuração do Hadoop (*.xml)
-process_templates "${HADOOP_CONF_DIR_TEMPLATE}" "${HADOOP_CONF_DIR}" "xml"
+# Gera arquivos de configuração do Hadoop e Spark
+process_templates "hadoop" "hadoop" "xml"
+process_templates "spark" "spark" "sh"
+process_templates "system" "system" "sh" # Para arquivos como .bash_common, etc.
 
-# Gera arquivos de configuração do Spark (*.sh)
-process_templates "${SPARK_CONF_DIR_TEMPLATE}" "${SPARK_HOME}/conf" "sh"
-
-# Verifica se o diretório de templates existe
-# if [ ! -d "${HADOOP_CONF_DIR_TEMPLATE}" ]; then
-#     log_error "Diretório de templates não encontrado em ${HADOOP_CONF_DIR_TEMPLATE}."
-# fi
-
-# Itera sobre todos os arquivos .xml.template e gera os arquivos .xml finais
-# `envsubst` substitui variáveis como ${SPARK_MASTER_HOSTNAME} pelos seus valores no ambiente.
-# for template in "${HADOOP_CONF_DIR_TEMPLATE}"/*.xml.template; do
-#     if [ -f "$template" ]; then
-#         # Extrai o nome do arquivo final (ex: core-site.xml)
-#         filename=$(basename "${template}" .template)
-#         destination="${HADOOP_CONF_DIR}/${filename}"
-#         log_info "Processando template '${template}' para gerar '${destination}'..."
-#         # Exportar as variáveis que o envsubst deve usar
-#         export SPARK_MASTER_HOSTNAME
-#         # Adicione outros exports aqui se necessário
-#         envsubst < "${template}" > "${destination}"
-#     fi
-# done
-
-log_info "Geração de arquivos de configuração concluída."
-
-# Listar os arquivos gerados para depuração
-ls -la "${HADOOP_CONF_DIR}"
+log_info "Geração de arquivos de configuração concluída. Verificando arquivos em ${CONFIG_PROCESSED_DIR}:"
+ls -lR "${CONFIG_PROCESSED_DIR}"
 
 # --- Configuração de Permissões ---
 log_info "Configurando permissões para o usuário '${APP_USER}'..."
 
-# Define permissões para os diretórios de configuração
-# Isso garante que o usuário não-privilegiado possa ler as configurações.
-chown -R "${APP_USER}:${APP_GROUP}" "${HADOOP_CONF_DIR}"
-chown -R "${APP_USER}:${APP_GROUP}" "${SPARK_HOME}/conf"
+# Cria diretórios de dados e logs e define permissões.
+# CORREÇÃO: Usa variáveis definidas no HADOOP/SPARK para consistência.
+mkdir -p "${HADOOP_HOME}/logs" "${SPARK_HOME}/logs" "${SPARK_HOME}/work"
+# Adicione outros diretórios aqui se necessário.
 
-# Define permissões para os diretórios de dados/logs/pids
-# (assumindo que foram criados e montados).
-# `mkdir -p` cria os diretórios caso não existam.
-mkdir -p ${HADOOP_DATA_DIRS}
-chown -R "${APP_USER}:${APP_GROUP}" ${HADOOP_DATA_DIRS}
+# Define o usuário como dono de todos os seus arquivos de trabalho.
+chown -R "${APP_USER}:${APP_GROUP}" "/home/${APP_USER}"
+chown -R "${APP_USER}:${APP_GROUP}" "${HADOOP_HOME}"
+chown -R "${APP_USER}:${APP_GROUP}" "${SPARK_HOME}"
 
 log_info "Permissões configuradas com sucesso."
 
 # --- Execução do Script Principal da Aplicação ---
-
-# O script de bootstrap é o responsável por iniciar os daemons (HDFS, YARN, etc.).
-# Em vez de executar o bootstrap como root e usar 'sudo' internamente, é uma
-# prática mais segura e limpa usar 'gosu' ou 'su-exec' para mudar para o usuário
-# não-privilegiado antes de executar o script principal.
-# 'gosu' precisa ser instalado no contêiner.
-
-# O `exec` no final é crucial: ele substitui o processo do entrypoint pelo
-# processo do bootstrap. Isso garante que o bootstrap se torne o processo principal
-# (PID 1) do contêiner, recebendo sinais do Docker (ex: SIGTERM em 'docker stop')
-# para um desligamento gracioso.
-
-BOOTSTRAP_SCRIPT="/home/${APP_USER}/scripts/bootstrap.sh"
-if [ ! -f "${BOOTSTRAP_SCRIPT}" ]; then
-    log_error "Script de bootstrap não encontrado em ${BOOTSTRAP_SCRIPT}."
+readonly BOOTSTRAP_SCRIPT="/home/${APP_USER}/scripts/bootstrap.sh"
+if [ ! -x "${BOOTSTRAP_SCRIPT}" ]; then
+    log_error "Script de bootstrap não encontrado ou não executável em ${BOOTSTRAP_SCRIPT}."
 fi
 
-log_info "Entregando a execução para o script de bootstrap: ${BOOTSTRAP_SCRIPT} como usuário '${APP_USER}'..."
-# Se 'gosu' estiver disponível (recomendado):
-# exec gosu "${APP_USER}" bash "${BOOTSTRAP_SCRIPT}" "$@"
-# O "$@" passa todos os argumentos recebidos pelo entrypoint para o bootstrap.
+log_info "Entregando a execução para: ${BOOTSTRAP_SCRIPT} (como usuário '${APP_USER}')..."
+# Usa `gosu` para mudar de usuário de forma segura.
+# `exec` substitui o processo do entrypoint, garantindo que o bootstrap seja o PID 1.
+# "$@" passa todos os argumentos recebidos pelo entrypoint (ex: "master", "worker") para o bootstrap.
+exec gosu "${APP_USER}" bash "${BOOTSTRAP_SCRIPT}" "$@"
+log_info "Script de bootstrap concluído. Contêiner pronto para uso."
 
-# Se 'gosu' não estiver disponível, usar `su -c` é uma alternativa, embora menos ideal:
-exec su - "${APP_USER}" -c "bash ${BOOTSTRAP_SCRIPT} \"\$@\"" -- "$@"
-# Esta sintaxe é um pouco complexa para garantir que os argumentos sejam passados corretamente.
-
-# O usuário DEVE executar o bootstrap como root (porque ele precisa fazer tarefas de root
-# que não foram feitas aqui), então a linha original é usada, mas com `exec`:
-# log_info "Executando o script de bootstrap como root..."
-# exec bash "${BOOTSTRAP_SCRIPT}" "$@"
-
-# finaliza o entrypoint com sucesso
-log_info "Entrypoint concluído com sucesso. O contêiner está pronto para uso."
-# Fim do script de entrypoint
-# =============================================================================
+# --- Fim do Script de Ponto de Entrada ---
+# Nota: O script acima deve ser executado como root no contêiner.
+#       O usuário definido em MY_USERNAME será usado para executar o bootstrap.
+#       Certifique-se de que o usuário tenha permissões adequadas para os diretórios e arquivos criados.
+#       O script de bootstrap deve ser responsável por iniciar os serviços necessários (Hadoop, Spark, etc.).
+#       Este script é o ponto de entrada do contêiner e deve ser executado como PID 1.
+#       Ele deve ser executado com o comando `docker run` ou equivalente,
+#       garantindo que o contêiner esteja configurado corretamente antes de iniciar os serviços.
+#       Certifique-se de que o contêiner tenha acesso às variáveis de ambiente necessárias.
+#       O contêiner deve ser iniciado com as opções corretas de rede e volumes,
+#       dependendo do ambiente em que será executado (ex: Docker Compose, Kubernetes, etc.).
+#       Este script é projetado para ser usado em um ambiente de desenvolvimento ou produção,
+#       onde o usuário e as permissões são gerenciados adequadamente.
+#       Certifique-se de que o contêiner tenha acesso aos recursos necessários (ex: rede, armazenamento, etc.).
+#       O script deve ser testado em um ambiente seguro antes de ser usado em produção,
+#       para garantir que todas as variáveis de ambiente e permissões estejam configuradas corretamente.
+#      

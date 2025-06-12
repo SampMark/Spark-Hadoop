@@ -1,20 +1,30 @@
+# docker-compose.template.yml
+# ----------------------------------------------------
+# ATENÇÃO: Este é um template. O arquivo final docker-compose.yml
+# é gerado pelo serviço 'init'.
+# ----------------------------------------------------
 services:
   namenode:
-    image: "${STACK_NAME}_namenode_1"
-    env_file: .env
-    container_name: "${STACK_NAME}_namenode_1"
+    image: "${IMAGE_NAME}"
+    container_name: "${STACK_NAME}_namenode"
     hostname: "namenode"
+    env_file:
+      - .env
+    secrets:
+      - user_password
     build:
       context: .
-      dockerfile: /docker/Dockerfile
+      dockerfile: ./docker/Dockerfile
       args:
         MY_USERNAME: "${MY_USERNAME}"
-        # Usa 'myuser' como padrão se MY_GROUP não estiver no .env
-        MY_GROUP: "${MY_GROUP:-myuser}"
         HADOOP_VERSION: "${HADOOP_VERSION}"
         SPARK_VERSION: "${SPARK_VERSION}"
     environment:
-      - MY_USERNAME=${MY_USERNAME}
+        HADOOP_VERSION: "${HADOOP_VERSION}"
+        SPARK_VERSION: "${SPARK_VERSION}"
+        STACK_NAME: "${STACK_NAME}"
+        MY_USERNAME: "${MY_USERNAME}"
+        PASSWORD_FILE: "/run/secrets/user_password"
     volumes:
       - namenode_data:/home/${MY_USERNAME}/hadoop/hdfs/namenode
       - ./config_processed/hadoop:/home/${MY_USERNAME}/config/hadoop
@@ -29,13 +39,15 @@ services:
       interval: 10s
       timeout: 5s
       retries: 12
+    command: ["bash", "/home/${MY_USERNAME}/scripts/bootstrap.sh", "master"]
 
   resourcemanager:
     depends_on:
       - namenode
-    container_name: "${STACK_NAME}_resourcemanager_1"
+    image: "${IMAGE_NAME}"
+    container_name: "${STACK_NAME}_resourcemanager"
     hostname: "resourcemanager"
-    image: "${STACK_NAME}_namenode_1"
+    env_file: .env
     environment:
       - MY_USERNAME=${MY_USERNAME}
     volumes:
@@ -53,9 +65,10 @@ services:
     depends_on:
       - namenode
       - resourcemanager
-    container_name: "${STACK_NAME}_spark-master_1"
+    image: "${IMAGE_NAME}"
+    container_name: "${STACK_NAME}_spark-master"
     hostname: "spark-master"
-    image: "${STACK_NAME}_namenode_1"
+    env_file: .env
     environment:
       - MY_USERNAME=${MY_USERNAME}
     volumes:
@@ -76,12 +89,13 @@ services:
   datanode:
     depends_on:
       - namenode
-    image: "${STACK_NAME}_namenode_1"
+    image: "${IMAGE_NAME}"
     environment:
       - MY_USERNAME=${MY_USERNAME}
     deploy:
       mode: replicated
       replicas: ${NUM_WORKER_NODES}
+    env_file: .env
     volumes:
       - datanode_data:/home/${MY_USERNAME}/hadoop/hdfs/datanode
       - ./config_processed/hadoop:/home/${MY_USERNAME}/config/hadoop
@@ -100,12 +114,13 @@ services:
     depends_on:
       - namenode
       - resourcemanager
-    image: "${STACK_NAME}_namenode_1"
+    image: "${IMAGE_NAME}"
     environment:
       - MY_USERNAME=${MY_USERNAME}
     deploy:
       mode: replicated
       replicas: ${NUM_WORKER_NODES}
+    env_file: .env
     volumes:
       - ./config_processed/hadoop:/home/${MY_USERNAME}/config/hadoop
       - .env:/home/${MY_USERNAME}/.env:ro
@@ -138,3 +153,7 @@ volumes:
   namenode_data:
   datanode_data:
   spark_master_data:
+
+secrets:
+  user_password:
+    file: .password

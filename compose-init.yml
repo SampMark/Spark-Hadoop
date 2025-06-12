@@ -4,7 +4,6 @@
 # Propósito:
 #   Este arquivo define APENAS o serviço 'init', que é responsável por
 #   gerar o arquivo principal 'docker-compose.yml' e baixar as dependências.
-#   Ele resolve o problema do "ovo e a galinha".
 #
 # Como Usar:
 #   docker compose -f compose-init.yml run --rm init
@@ -13,31 +12,42 @@
 version: '3.8'
 
 services:
-  # O serviço 'init' é um contêiner temporário que executa o script de inicialização.
   init:
-    # Usa uma imagem Alpine leve. O script 'download.sh' dentro dela irá instalar o 'aria2c'.
-    image: alpine:latest
-    container_name: ${STACK_NAME:-hadoop-spark-cluster}-init-runner
-    
-    # Define o diretório de trabalho dentro do contêiner.
-    working_dir: /workspace
+    # 1. Faz build de um stage 'init' no Dockerfile que contenha bash, envsubst, curl, wget, etc.
+    build:
+      # Define o contexto de build como o diretório atual.
+      context: .
+      # Define o Dockerfile a ser usado para construir a imagem.
+      dockerfile: ./docker/Dockerfile
+      target: init
+    image: spark-hadoop-init:latest
+    container_name: spark_hadoop_init
 
-    # Monta o diretório atual do seu projeto (host) para dentro do contêiner.
-    # Isso permite que o script leia/escreva arquivos no seu projeto.
+    # 2. Monta todo o repositório dentro do container, para que scripts/* e config_files/* fiquem disponíveis
     volumes:
-      - ./:/workspace
+      - ./:/app:rw
 
-    # Carrega as variáveis do seu arquivo .env para dentro do contêiner.
-    # Essencial para que o init.sh saiba o número de workers, versões, etc.
+    # 3. Carrega variáveis de ambiente
     env_file:
+      - .env.template
       - .env
 
-    # Define uma variável de ambiente específica para que o script saiba
-    # que está sendo executado corretamente via 'docker compose'.
+    # 4. Injeta a senha como secret, disponível em /run/secrets/user_password
+    secrets:
+      - user_password
+
     environment:
       - DOCKER_COMPOSE_RUN=true
+      - PASSWORD_FILE=/run/secrets/user_password
+    
+    # 5. Permite logs interativos
+    tty: true
+    stdin_open: true
 
-    # O comando que será executado quando o contêiner iniciar.
-    # Ele chama o script init.sh usando o shell 'sh' (disponível no Alpine).
-    command: ["sh", "scripts/init.sh"]
+    # 6. Executa o nosso init.sh
+    command: ["bash", "/app/scripts/init.sh"]
+
+secrets:
+  user_password:
+    file: .password
 

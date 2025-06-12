@@ -8,7 +8,7 @@
     grpcio-status
     protobuf==5.28.3
     graphframes
-    pyspark==3.5.5  # Use a variável ${SPARK_VERSION} ou um valor fixo
+    pyspark==${SPARK_VERSION}  # Use a variável ${SPARK_VERSION} ou um valor fixo (ex: 3.5.5)
     pyarrow==20.0.0
     jupyterlab==4.4.2
     ```
