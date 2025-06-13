@@ -3,7 +3,9 @@
 # ATENÇÃO: Este é um template. O arquivo final docker-compose.yml
 # é gerado pelo serviço 'init'.
 # ----------------------------------------------------
+# Definição dos serviços (contêineres)
 services:
+  # --- SERVIÇOS HADOOP ---
   namenode:
     image: "${IMAGE_NAME}"
     container_name: "${STACK_NAME}_namenode"
@@ -60,7 +62,10 @@ services:
       interval: 10s
       timeout: 5s
       retries: 12
-
+  # --- SERVIÇOS SPARK ---
+  # Atenção: O serviço spark-master é o ponto de entrada para o Spark.
+  # Ele deve ser iniciado após o namenode e resourcemanager.
+  # Os serviços spark-worker são replicados de acordo com NUM_WORKER_NODES.
   spark-master:
     depends_on:
       - namenode
@@ -68,24 +73,30 @@ services:
     image: "${IMAGE_NAME}"
     container_name: "${STACK_NAME}_spark-master"
     hostname: "spark-master"
-    env_file: .env
+    ports:
+      - "${HOST_SPARK_UI_PORT}:7077"            # Porta de submissão de jobs do Spark
+      - "${HOST_SPARK_HISTORY_UI_PORT}:18080"   # Porta do UI do Spark History Server
+      - "${JUPYTER_PORT}:8888"                  # Porta do Jupyter Notebook
+    env_file: .env                              # Carrega variáveis de ambiente do arquivo .env
+    deploy:
+      mode: replicated
+      replicas: 1
     environment:
+      - SPARK_MODE=master
+      - HADOOP_VERSION=${HADOOP_VERSION}
+      - SPARK_VERSION=${SPARK_VERSION}
       - MY_USERNAME=${MY_USERNAME}
     volumes:
       - spark_master_data:/home/${MY_USERNAME}/spark/logs
       - ./config_processed/spark:/home/${MY_USERNAME}/config/spark
       - .env:/home/${MY_USERNAME}/.env:ro
       - ./myfiles:/home/${MY_USERNAME}/myfiles
-    ports:
-      - "${HOST_SPARK_UI_PORT}:7077"
-      - "${HOST_SPARK_HISTORY_UI_PORT}:18080"
-      - "${JUPYTER_PORT}:8888"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:7077/"]
       interval: 10s
       timeout: 5s
       retries: 12
-
+  
   datanode:
     depends_on:
       - namenode
@@ -149,6 +160,84 @@ services:
       timeout: 5s
       retries: 10
 
+# --- SERVIÇO SPARK HISTORY SERVER ---
+  # O Spark History Server é responsável por manter o histórico de jobs do Spark.
+  spark-history-server:
+    depends_on:
+      - spark-master
+    image: "${IMAGE_NAME}"
+    container_name: "${STACK_NAME}_spark-history-server"
+    hostname: "spark-history-server"
+    ports:
+      - "${HOST_SPARK_HISTORY_UI_PORT}:18080"  # Porta do UI do Spark History Server
+    env_file: .env
+    environment:
+      - SPARK_MODE=historyserver
+      - HADOOP_VERSION=${HADOOP_VERSION}
+      - SPARK_VERSION=${SPARK_VERSION}
+      - MY_USERNAME=${MY_USERNAME}
+    volumes:
+      - spark_master_data:/home/${MY_USERNAME}/spark/logs
+      - ./config_processed/spark:/home/${MY_USERNAME}/config/spark
+      - .env:/home/${MY_USERNAME}/.env:ro
+      - ./myfiles:/home/${MY_USERNAME}/myfiles
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:18080/"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  # --- SERVIÇO JUPYTER ---
+  # O Jupyter Notebook é a interface  escolhida para desenvolvimento em Python.
+  jupyter:
+    depends_on:
+      - spark-master
+    image: "${IMAGE_NAME}"
+    container_name: "${STACK_NAME}_jupyter"
+    hostname: "jupyter"
+    ports:
+      - "${JUPYTER_PORT}:8888"  # Porta do Jupyter Notebook
+    env_file: .env
+    environment:
+      - SPARK_MODE=jupyter
+      - HADOOP_VERSION=${HADOOP_VERSION}
+      - SPARK_VERSION=${SPARK_VERSION}
+      - MY_USERNAME=${MY_USERNAME}
+    volumes:
+      - spark_master_data:/home/${MY_USERNAME}/spark/logs
+      - ./config_processed/spark:/home/${MY_USERNAME}/config/spark
+      - .env:/home/${MY_USERNAME}/.env:ro
+      - ./myfiles:/home/${MY_USERNAME}/myfiles
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8888/"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+# --- SERVIÇO INIT ---
+# Este serviço é responsável por gerar o arquivo docker-compose.yml e baixar as dependências.
+# Ele deve ser executado apenas uma vez para preparar o ambiente.
+  init:
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile
+      target: init
+    image: spark-hadoop-init:latest
+    container_name: spark_hadoop_init
+    volumes:
+      - ./:/app:rw
+    env_file:
+      - .env.template
+      - .env
+    secrets:
+      - user_password
+    environment:
+      - DOCKER_COMPOSE_RUN=true
+      - PASSWORD_FILE=/run/secrets/user_password
+    tty: true
+    stdin_open: true
+    command: ["bash", "/app/scripts/init.sh"]
+    
 volumes:
   namenode_data:
   datanode_data:

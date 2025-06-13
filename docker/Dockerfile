@@ -41,10 +41,10 @@ ENV APT_MIRROR=${APT_MIRROR}
 # Configura o repositório APT para usar o mirror especificado
 RUN \
     echo "Configuring APT mirror to ${APT_MIRROR}..." && \
-    echo "deb ${APT_MIRROR} focal main restricted universe multiverse" > /etc/apt/sources.list && \
-    echo "deb ${APT_MIRROR} focal-updates main restricted universe multiverse" >> /etc/apt/sources.list && \
-    echo "deb ${APT_MIRROR} focal-security main restricted universe multiverse" >> /etc/apt/sources.list && \
-    echo "deb ${APT_MIRROR} focal-backports main restricted universe multiverse" >> /etc/apt/sources.list && \
+    echo "deb ${APT_MIRROR} noble main restricted universe multiverse" > /etc/apt/sources.list && \
+    echo "deb ${APT_MIRROR} noble-updates main restricted universe multiverse" >> /etc/apt/sources.list && \
+    echo "deb ${APT_MIRROR} noble-security main restricted universe multiverse" >> /etc/apt/sources.list && \
+    echo "deb ${APT_MIRROR} noble-backports main restricted universe multiverse" >> /etc/apt/sources.list && \
     apt-get update -qq && \
     apt-get install -y --no-install-recommends wget curl && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
@@ -76,7 +76,7 @@ WORKDIR ${MY_WORKDIR}
 
 # Copia o tarball e o checksum do contexto de build.
 # O Dockerfile agora DEPENDE que esses arquivos tenham sido pré-baixados.
-COPY hadoop-*.tar.gz hadoop-*.tar.gz.sha512 ./
+COPY hadoop-3.4.1.tar.gz hadoop-3.4.1.tar.gz.sha512 ./
 
 # Valida, verifica o checksum e extrai. Remove a lógica de 'wget'.
 RUN \
@@ -113,12 +113,14 @@ ENV MY_USERNAME=myuser
 ENV MY_WORKDIR=/home/${MY_USERNAME}
 ENV SPARK_VERSION=${SPARK_VERSION}
 ENV SPARK_HOME=${MY_WORKDIR}/spark
-ENV SPARK_TARBALL="spark-${SPARK_VERSION}-bin-${SPARK_PROFILE}.tgz"
+ENV SPARK_TARBALL="spark-${SPARK_VERSION}-bin-${SPARK_PROFILE}.tar.gz"
 
 WORKDIR ${MY_WORKDIR}
 
 # Copia o tarball e o checksum do contexto.
-COPY spark-*.tgz spark-*.tgz.sha512 ./
+# ATENÇÃO: Se houver mais de um arquivo que combine com o wildcard (spark-*.tar.gz ou spark-*.tar.gz.sha512),
+# o build pode falhar devido à ambiguidade. Certifique-se de que apenas UM arquivo de cada tipo esteja presente no contexto.
+COPY spark-*.tar.gz spark-*.tar.gz.sha512 ./
 
 # Valida, verifica o checksum e extrai.
 RUN \
@@ -131,13 +133,13 @@ RUN \
     # 2. Valida a integridade do arquivo
     echo "Verificando checksum do Spark..." && \
     sha512sum -c "${SPARK_TARBALL}.sha512" && \
-    # 3. Extrai o Spark
+    # 3. Extrai o Spark e renomeia o diretório extraído
     echo "Extraindo Spark..." && \
     tar -zxf "${SPARK_TARBALL}" -C ${MY_WORKDIR} && \
+    EXTRACTED_DIR=$(tar -tzf "${SPARK_TARBALL}" | head -1 | cut -f1 -d"/") && \
+    mv "${MY_WORKDIR}/${EXTRACTED_DIR}" "${SPARK_HOME}" && \
     # 4. Limpeza
-    rm -f "${SPARK_TARBALL}" "${SPARK_TARBALL}.sha512" && \
-    # 5. Renomeia para um nome genérico
-    mv "${MY_WORKDIR}/spark-${SPARK_VERSION}-bin-${SPARK_PROFILE}" "${SPARK_HOME}"
+    rm -f "${SPARK_TARBALL}" "${SPARK_TARBALL}.sha512"
 
 # =============================================================================
 # ESTÁGIO 3: Imagem Final
@@ -167,36 +169,58 @@ ENV JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN \
-    # <<< CORREÇÃO >>>: Lógica de APT_MIRROR mantida, mas ciente das limitações com o novo formato de sources.
+    # <<< CORREÇÃO >>>: A lógica de APT_MIRROR abaixo apenas substitui a URL padrão do mirror do Ubuntu em /etc/apt/sources.list.
+    # Limitação: Se o arquivo sources.list tiver um formato customizado ou múltiplos mirrors não padrão, esta substituição pode não funcionar corretamente.
     if [ -n "$APT_MIRROR" ]; then \
-      sed -i "s|http://archive.ubuntu.com/ubuntu|${APT_MIRROR}|g" /etc/apt/sources.list.d/ubuntu.sources; \
+      sed -i "s|http://archive.ubuntu.com/ubuntu|${APT_MIRROR}|g" /etc/apt/sources.list; \
     fi && \
     apt-get update -qq && \
     apt-get install -y --no-install-recommends \
       openjdk-11-jdk-headless \
       ssh \
+      procps \
+      net-tools \
+      lsof \
       sudo \
+      gosu \
       python3.12 \
       python3-pip \
+      python3.12-venv \
+      python3.12-dev \
+      python3.12-distutils \
+      python3.12-apt \
+      python3.12-tk \
+      jupyterlab \
       nano \
       dos2unix \
       wget \
       curl \
       iputils-ping \
-      gosu \
     && \
     apt-get autoremove -yqq --purge && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* && \
-    ln -sf /usr/bin/python3.12 /usr/bin/python && \
-    ln -sf /usr/bin/python3.12 /usr/bin/python3
+    if [ ! -e /usr/bin/python ] || [ "$(readlink -f /usr/bin/python)" != "/usr/bin/python3.12" ]; then \
+      ln -sf /usr/bin/python3.12 /usr/bin/python; \
+    else \
+      echo "Warning: /usr/bin/python already exists and points to $(readlink -f /usr/bin/python)"; \
+    fi && \
+    if [ ! -e /usr/bin/python3 ] || [ "$(readlink -f /usr/bin/python3)" != "/usr/bin/python3.12" ]; then \
+      ln -sf /usr/bin/python3.12 /usr/bin/python3; \
+    else \
+      echo "Warning: /usr/bin/python3 already exists and points to $(readlink -f /usr/bin/python3)"; \
+    fi
 
 # Instala dependências necessárias para o projeto
 COPY ./requirements.txt /tmp/requirements.txt
 
 RUN \
-    pip install --no-cache-dir --break-system-packages -q -r /tmp/requirements.txt && \
-    rm /tmp/requirements.txt
+    python3.12 -m pip install --upgrade pip && \
+    python3.12 -m venv /opt/venv && \
+    . /opt/venv/bin/activate && \
+    pip install --no-cache-dir -q -r /tmp/requirements.txt && \
+    rm -f /tmp/requirements.txt
+ENV PATH="/opt/venv/bin:$PATH"
 
 RUN \
     userdel --remove ubuntu || true && \
@@ -207,17 +231,23 @@ RUN \
 
 WORKDIR ${MY_WORKDIR}
 
-# Consolida as instruções COPY para reduzir camadas.
-# Copia binários preparados e depois todos os arquivos da aplicação.
-COPY --from=build-hadoop --chown=${MY_USERNAME}:${MY_GROUP} ${HADOOP_HOME} ${HADOOP_HOME}/
-COPY --from=build-spark --chown=${MY_USERNAME}:${MY_GROUP} ${SPARK_HOME} ${SPARK_HOME}/
-COPY --chown=${MY_USERNAME}:${MY_GROUP} . ${MY_WORKDIR}/
+# Copie explicitamente apenas os arquivos e diretórios necessários para o build final
+COPY --chown=${MY_USERNAME}:${MY_GROUP} scripts/ ${MY_WORKDIR}/scripts/
+COPY --chown=${MY_USERNAME}:${MY_GROUP} docker/entrypoint.sh ${MY_WORKDIR}/docker/entrypoint.sh
+COPY --chown=${MY_USERNAME}:${MY_GROUP} .bash_common ${MY_WORKDIR}/.bash_common
+# Adicione outras linhas COPY conforme necessário para arquivos específicos do projeto
 
-USER ${MY_USERNAME}
+# Copia binários preparados e depois todos os arquivos da aplicação.
+COPY --from=build-hadoop --chown=${MY_USERNAME}:${MY_GROUP} /home/myuser/hadoop ${HADOOP_HOME}/
 RUN \
-    dos2unix -q -k ${MY_WORKDIR}/scripts/*.sh ${MY_WORKDIR}/docker/entrypoint.sh && \
+    if find "${MY_WORKDIR}/scripts" -maxdepth 1 -name '*.sh' | grep -q .; then \
+      find "${MY_WORKDIR}/scripts" -maxdepth 1 -name '*.sh' -exec dos2unix -q -k {} +; \
+    fi && \
+    dos2unix -q -k ${MY_WORKDIR}/docker/entrypoint.sh && \
     echo -e '\n# Carrega configurações comuns do cluster\n[ -f "${HOME}/.bash_common" ] && . "${HOME}/.bash_common"\n' >> "${MY_WORKDIR}/.bashrc" && \
-    ssh-keygen -q -t rsa -N "" -f ${MY_WORKDIR}/.ssh/id_rsa && \
+    if [ ! -f "${MY_WORKDIR}/.ssh/id_rsa" ]; then \
+      ssh-keygen -q -t rsa -N "" -f ${MY_WORKDIR}/.ssh/id_rsa; \
+    fi && \
     cat ${MY_WORKDIR}/.ssh/id_rsa.pub >> ${MY_WORKDIR}/.ssh/authorized_keys && \
     # Adicionado .ssh/config à configuração de permissões
     chmod 0700 ${MY_WORKDIR}/.ssh && \
@@ -225,7 +255,5 @@ RUN \
     chmod 0644 ${MY_WORKDIR}/.ssh/id_rsa.pub && \
     # Cria diretório de log para o metastore do Spark SQL.
     mkdir -p ${MY_WORKDIR}/derby-metastore
-
-# Configura o entrypoint e o comando padrão
-ENTRYPOINT ["/home/myuser/docker/entrypoint.sh"]
-CMD ["bash", "/home/myuser/scripts/bootstrap.sh", "MASTER"]
+ENTRYPOINT ["${MY_WORKDIR}/docker/entrypoint.sh"]
+CMD ["bash", "${MY_WORKDIR}/scripts/bootstrap.sh", "MASTER"]
