@@ -21,6 +21,14 @@
 #      - Estágio 'final': Constrói a imagem final combinando os binários preparados
 #        com as dependências do sistema e configurações.
 # =============================================================================
+# Estágio de Inicialização
+# =============================================================================
+# Este estágio é responsável por configurar o ambiente inicial, baixar as
+# dependências necessárias e preparar o ambiente para os estágios de build.
+# Ele não contém os binários do Hadoop ou Spark, apenas o script de inicialização.
+# =============================================================================
+# Base: Ubuntu 24.04
+# =============================================================================
 FROM ubuntu:24.04 AS init
 LABEL maintainer="Marcus V D Sampaio <marcus.sampaio@ifrn.edu.br>"
 LABEL description="Imagem Docker com Apache Hadoop, Apache Spark e JupyterLab para clusters de Big Data."
