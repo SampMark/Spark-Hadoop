@@ -9,7 +9,6 @@
 #   docker compose -f compose-init.yml run --rm init
 # =============================================================================
 
-version: '3.8'
 
 services:
   init:

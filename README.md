@@ -66,37 +66,65 @@ Antes de começar, certifique-se dos seguintes requisitos, softwares instalados 
 ---
 
 ## 3. ✨Início Rápido
-Siga estes passos para colocar seu cluster no ar em poucos minutos.
+Siga estes passos para provisionar seu cluster Spark–Hadoop no ar em poucos minutos.
 
-**Passo 1: Clonar o Repositório**
+**3.1. Clonar o repositório Spark-Hadoop**
 Abra seu terminal e clone este repositório para sua máquina local.
 ```
 git clone https://github.com/SampMark/Spark-Hadoop.git
 cd Spark-Hadoop
 ```
-
-Renomei os arquivos `.env.template` e `docker-compose.template.yml`
+**3.2. Configurar variáveis de ambiente**
+Crie seu arquivo `.env` a partir do template, caso necessário, ajuste as versões e número de workers:
 
 ```
-mv .env.template .env
-mv docker-compose.template.yml docker-compose.yml
+cp .env.template .env
+# Edite .env conforme sua necessidade (HADOOP_VERSION, SPARK_VERSION, SPARK_WORKER_INSTANCES, DOWNLOAD_HADOOP_SPARK, etc.)
 ```
 
-**Passo 2: Construir e Iniciar o Cluster**
-Com o Docker em execução, execute o seguinte comando na raiz do projeto para construir as imagens e iniciar todos os serviços em background:
+**3.3. Gerar o `docker-compose.yml` e baixar binários**
+
+Utilize o script de inicialização para processar o template e (opcionalmente) baixar os _tarballs_ do Hadoop e Spark:
+
+```
+docker compose -f compose-init.yml run --rm init
+```
+Obsercação: verifique as mensagens de log para garantir que docker-compose.yml foi gerado e que os arquivos foram baixados com sucesso.
+
+
+**3.4. Construir as imagens Docker**
+Com o Docker em execução, execute o seguinte comando na raiz do projeto para construir as imagens e iniciar todos os serviços em _background_:
 ```
 docker compose up
 ```
-Opcionalmente:
-
+**3.5. Subir o cluster**
+Para iniciar todos os serviços em background:
 ```
-docker compose up -d --build
+docker compose up -d
 ```
    * `up`: Cria e inicia os contêineres.
    * `-d`: Modo "detached" (os contêineres rodam em background).
-   * `--build`: Força a construção da imagem Docker na primeira vez ou se o Dockerfile for alterado.
 
-O primeiro início pode demorar alguns minutos, pois o Docker irá baixar as imagens base e as distribuições do Hadoop e Spark. Após a conclusão, seu cluster estará pronto para uso!
+Para acompanhar logs em tempo real (ex.: master):
+```
+docker compose logs -f spark-master
+```
+O primeiro início pode demorar alguns minutos, pois o Docker irá baixar as imagens base e as distribuições do Hadoop e Spark. 
+Após a conclusão, seu cluster estará pronto para uso!
+
+**3.6. Recriar o cluster após alterações**
+Caso modifique o `.env` ou os templates, pare e remova os contêineres antes de subir novamente:
+```
+docker compose down
+docker compose up -d --build
+```
+
+**3.7. Acessar as UIs Web**
+
+* HDFS NameNode: http://localhost:${HDFS_UI_PORT:-9870}
+* YARN ResourceManager: http://localhost:${YARN_UI_PORT:-8088}
+* Spark History Server: http://localhost:${SPARK_HISTORY_UI_PORT:-18080}
+* JupyterLab: http://localhost:${JUPYTER_PORT:-8888}
 
 ---
 

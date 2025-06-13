@@ -21,6 +21,31 @@
 #      - Estágio 'final': Constrói a imagem final combinando os binários preparados
 #        com as dependências do sistema e configurações.
 # =============================================================================
+FROM ubuntu:24.04 AS init
+LABEL maintainer="Marcus V D Sampaio <marcus.sampaio@ifrn.edu.br>"
+LABEL description="Imagem Docker com Apache Hadoop, Apache Spark e JupyterLab para clusters de Big Data."
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+# Argumentos de build para o repositório APT
+ARG APT_MIRROR=http://archive.ubuntu.com/ubuntu
+# Variáveis de ambiente para o estágio
+ENV DEBIAN_FRONTEND=noninteractive
+ENV APT_MIRROR=${APT_MIRROR}
+# Configura o repositório APT para usar o mirror especificado
+RUN \
+    echo "Configuring APT mirror to ${APT_MIRROR}..." && \
+    echo "deb ${APT_MIRROR} focal main restricted universe multiverse" > /etc/apt/sources.list && \
+    echo "deb ${APT_MIRROR} focal-updates main restricted universe multiverse" >> /etc/apt/sources.list && \
+    echo "deb ${APT_MIRROR} focal-security main restricted universe multiverse" >> /etc/apt/sources.list && \
+    echo "deb ${APT_MIRROR} focal-backports main restricted universe multiverse" >> /etc/apt/sources.list && \
+    apt-get update -qq && \
+    apt-get install -y --no-install-recommends wget curl && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+# Copia o script de inicialização para o contexto de build
+COPY init.sh /usr/local/bin/init.sh
+# Torna o script executável
+RUN chmod +x /usr/local/bin/init.sh
+# Define o entrypoint para o script de inicialização
+ENTRYPOINT ["/usr/local/bin/init.sh"]
 
 # =============================================================================
 # ESTÁGIO 1: Preparação e Validação do Hadoop
