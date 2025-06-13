@@ -15,9 +15,9 @@ services:
     # 1. Faz build de um stage 'init' no Dockerfile que contenha bash, envsubst, curl, wget, etc.
     build:
       # Define o contexto de build como o diretório atual.
-      context: .
+      context: ./docker
       # Define o Dockerfile a ser usado para construir a imagem.
-      dockerfile: ./docker/Dockerfile
+      dockerfile: Dockerfile
       target: init
     image: spark-hadoop-init:latest
     container_name: spark_hadoop_init
