@@ -21,24 +21,46 @@
 #      - Estágio 'final': Constrói a imagem final combinando os binários preparados
 #        com as dependências do sistema e configurações.
 # =============================================================================
+
+### Argumentos de Build
+# Argumentos usados para definir as versões do Hadoop, Spark, Java e Ubuntu.
+# Podem ser substituídos durante o build usando a opção --build-arg.
+ARG HADOOP_VERSION=3.4.1
+ARG SPARK_VERSION=3.5.6
+ARG JAVA_VERSION=11
+ARG UBUNTU_VERSION=24.04
+ARG APT_MIRROR=http://archive.ubuntu.com/ubuntu
+
+################################################################################
 # Estágio de Inicialização
-# =============================================================================
+################################################################################
 # Este estágio é responsável por configurar o ambiente inicial, baixar as
 # dependências necessárias e preparar o ambiente para os estágios de build.
 # Ele não contém os binários do Hadoop ou Spark, apenas o script de inicialização.
 # =============================================================================
-# Base: Ubuntu 24.04
-# =============================================================================
-FROM ubuntu:24.04 AS init
+FROM ubuntu:${UBUNTU_VERSION} AS init
+
 LABEL maintainer="Marcus V D Sampaio <marcus.sampaio@ifrn.edu.br>"
 LABEL description="Imagem Docker com Apache Hadoop, Apache Spark e JupyterLab para clusters de Big Data."
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
-# Argumentos de build para o repositório APT
-ARG APT_MIRROR=http://archive.ubuntu.com/ubuntu
-# Variáveis de ambiente para o estágio
-ENV DEBIAN_FRONTEND=noninteractive
-ENV APT_MIRROR=${APT_MIRROR}
-# Configura o repositório APT para usar o mirror especificado
+
+# Definições de ambiente
+ARG HADOOP_VERSION
+ARG SPARK_VERSION
+ARG JAVA_VERSION
+ARG APT_MIRROR
+
+# Variáveis de ambiente para o estágio de inicialização
+ENV HADOOP_VERSION=${HADOOP_VERSION} \
+    SPARK_VERSION=${SPARK_VERSION} \
+    JAVA_VERSION=${JAVA_VERSION} \
+    HADOOP_HOME=/opt/hadoop \
+    SPARK_HOME=/opt/spark \
+    JAVA_HOME=/usr/lib/jvm/java-${JAVA_VERSION}-openjdk-amd64 \
+    PATH=${HADOOP_HOME}/bin:${HADOOP_HOME}/sbin:${SPARK_HOME}/bin:${SPARK_HOME}/sbin:${JAVA_HOME}/bin:${PATH} \
+    DEBIAN_FRONTEND=noninteractive
+
+# Instalações básicas e preparatórias
 RUN \
     echo "Configuring APT mirror to ${APT_MIRROR}..." && \
     echo "deb ${APT_MIRROR} noble main restricted universe multiverse" > /etc/apt/sources.list && \
@@ -46,8 +68,12 @@ RUN \
     echo "deb ${APT_MIRROR} noble-security main restricted universe multiverse" >> /etc/apt/sources.list && \
     echo "deb ${APT_MIRROR} noble-backports main restricted universe multiverse" >> /etc/apt/sources.list && \
     apt-get update -qq && \
-    apt-get install -y --no-install-recommends wget curl && \
+    apt-get install -y --no-install-recommends \
+      curl wget gnupg lsb-release ca-certificates && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
+# Cria diretório de trabalho
+WORKDIR /usr/local/bin
+
 # Copia o script de inicialização para o contexto de build
 COPY init.sh /usr/local/bin/init.sh
 # Torna o script executável
@@ -58,7 +84,7 @@ ENTRYPOINT ["/usr/local/bin/init.sh"]
 # =============================================================================
 # ESTÁGIO 1: Preparação e Validação do Hadoop
 # =============================================================================
-FROM ubuntu:24.04 AS build-hadoop
+FROM ubuntu:${UBUNTU_VERSION} AS build-hadoop
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
@@ -100,7 +126,7 @@ RUN \
 # =============================================================================
 # ESTÁGIO 2: Preparação e Validação do Spark
 # =============================================================================
-FROM ubuntu:24.04 AS build-spark
+FROM ubuntu:${UBUNTU_VERSION} AS build-spark
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
@@ -144,7 +170,7 @@ RUN \
 # =============================================================================
 # ESTÁGIO 3: Imagem Final
 # =============================================================================
-FROM ubuntu:24.04 AS final
+FROM ubuntu:${UBUNTU_VERSION} AS final
 
 LABEL maintainer="Marcus V D Sampaio <prof.marcus.sampaio@gmail.com>"
 LABEL description="Imagem Docker com Apache Hadoop, Apache Spark e JupyterLab para clusters de Big Data."
@@ -178,6 +204,10 @@ RUN \
     apt-get install -y --no-install-recommends \
       openjdk-11-jdk-headless \
       ssh \
+      openssh-client \
+      openssh-server \
+      openssl \
+      ca-certificates \
       procps \
       net-tools \
       lsof \
