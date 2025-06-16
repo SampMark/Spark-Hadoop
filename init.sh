@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 # =============================================================================
 # Script de Inicialização e Geração do Docker Compose v2.0
 #
