@@ -1,9 +1,8 @@
 # =============================================================================
-# Dockerfile para Cluster Hadoop e Spark (VERSÃO REVISADA)
+# Dockerfile para Cluster Hadoop e Spark
 #
-# Autor: Marcus V D Sampaio/Organização: IFRN - Baseado no script de Carlos M D Viegas
-# Versão: 1.2 (Revisado com base nas melhores práticas)
-# Data: 2025-06-11
+# Autor: Marcus V D Sampaio/Organização: IFRN 
+# Data: 2025-06-16
 #
 # Descrição:
 #   Este Dockerfile cria uma imagem Docker contendo um ambiente completo com
@@ -32,8 +31,9 @@ ARG UBUNTU_VERSION=24.04
 ARG APT_MIRROR=http://archive.ubuntu.com/ubuntu
 
 ################################################################################
-# Estágio de Inicialização (init)
+# Estágio 1: Inicialização (init)
 ################################################################################
+# Propósito: Executar o script init.sh para gerar o docker-compose.yml
 # Este estágio é responsável por configurar o ambiente inicial, baixar as
 # dependências necessárias e preparar o ambiente para os estágios de build.
 # Ele não contém os binários do Hadoop ou Spark, apenas o script de inicialização.
@@ -46,21 +46,8 @@ LABEL description="Imagem Docker com Apache Hadoop e Spark e JupyterLab para clu
 # SHELL definido como bash para suportar 'pipefail'
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
-# Definições de ambiente
-ARG HADOOP_VERSION
-ARG SPARK_VERSION
-ARG JAVA_VERSION
 ARG APT_MIRROR
-
-# Variáveis de ambiente para o estágio de inicialização
-ENV HADOOP_VERSION=${HADOOP_VERSION} \
-    SPARK_VERSION=${SPARK_VERSION} \
-    JAVA_VERSION=${JAVA_VERSION} \
-    HADOOP_HOME=/opt/hadoop \
-    SPARK_HOME=/opt/spark \
-    JAVA_HOME=/usr/lib/jvm/java-${JAVA_VERSION}-openjdk-amd64 \
-    PATH=${HADOOP_HOME}/bin:${HADOOP_HOME}/sbin:${SPARK_HOME}/bin:${SPARK_HOME}/sbin:${JAVA_HOME}/bin:${PATH} \
-    DEBIAN_FRONTEND=noninteractive
+ENV DEBIAN_FRONTEND=noninteractive
 
 # Instala dependências
 RUN \
@@ -95,7 +82,8 @@ COPY scripts/ ./scripts/
 # COPY init.sh /usr/local/bin/init.sh
 
 # Garante que os scripts tenham permissão de execução.
-RUN chmod +x init.sh scripts/download_all.sh
+RUN chmod +x init.sh && \
+    if [ -f "scripts/download_all.sh" ]; then chmod +x scripts/download_all.sh; fi
 # RUN chmod +x /usr/local/bin/init.sh
 
 # Define o entrypoint para o script de inicialização
@@ -103,7 +91,7 @@ ENTRYPOINT ["./init.sh"]
 # ENTRYPOINT ["/usr/local/bin/init.sh"]
 
 # =============================================================================
-# ESTÁGIO 1: Preparação e Validação do Hadoop
+# ESTÁGIO 2: Build do Hadoop (Preparação e Validação)
 # =============================================================================
 FROM ubuntu:${UBUNTU_VERSION} AS build-hadoop
 
@@ -114,7 +102,8 @@ ARG HADOOP_VERSION=3.4.1
 
 # Variáveis de ambiente para o estágio
 ENV MY_USERNAME=myuser
-ENV MY_WORKDIR=/home/${MY_USERNAME}
+ENV MY_WORKDIR=/opt
+# ENV MY_WORKDIR=/home/${MY_USERNAME}
 ENV HADOOP_VERSION=${HADOOP_VERSION}
 ENV HADOOP_HOME=${MY_WORKDIR}/hadoop
 ENV HADOOP_TARBALL="hadoop-${HADOOP_VERSION}.tar.gz"
@@ -145,7 +134,7 @@ RUN \
     mv "${MY_WORKDIR}/hadoop-${HADOOP_VERSION}" "${HADOOP_HOME}"
 
 # =============================================================================
-# ESTÁGIO 2: Preparação e Validação do Spark
+# ESTÁGIO 3: Build do Spark (Preparação e Validação)
 # =============================================================================
 FROM ubuntu:${UBUNTU_VERSION} AS build-spark
 
@@ -157,7 +146,8 @@ ARG SPARK_PROFILE=hadoop3
 
 # Variáveis de ambiente para o estágio
 ENV MY_USERNAME=myuser
-ENV MY_WORKDIR=/home/${MY_USERNAME}
+ENV MY_WORKDIR=/opt
+# ENV MY_WORKDIR=/home/${MY_USERNAME}
 ENV SPARK_VERSION=${SPARK_VERSION}
 ENV SPARK_HOME=${MY_WORKDIR}/spark
 ENV SPARK_TARBALL="spark-${SPARK_VERSION}-bin-${SPARK_PROFILE}.tar.gz"
@@ -189,7 +179,7 @@ RUN \
     rm -f "${SPARK_TARBALL}" "${SPARK_TARBALL}.sha512"
 
 # =============================================================================
-# ESTÁGIO 3: Imagem Final
+# ESTÁGIO 4: Imagem Final
 # =============================================================================
 FROM ubuntu:${UBUNTU_VERSION} AS final
 
@@ -216,7 +206,7 @@ ENV JAVA_HOME=/usr/lib/jvm/java-${JAVA_VERSION}-openjdk-amd64
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN \
-    # <<< CORREÇÃO >>>: A lógica de APT_MIRROR abaixo apenas substitui a URL padrão do mirror do Ubuntu em /etc/apt/sources.list.
+    # Instala todas as dependências do sistema
     # Limitação: Se o arquivo sources.list tiver um formato customizado ou múltiplos mirrors não padrão, esta substituição pode não funcionar corretamente.
     if [ -n "$APT_MIRROR" ]; then \
       sed -i "s|http://archive.ubuntu.com/ubuntu|${APT_MIRROR}|g" /etc/apt/sources.list; \
@@ -262,53 +252,96 @@ RUN \
       echo "Warning: /usr/bin/python3 already exists and points to $(readlink -f /usr/bin/python3)"; \
     fi
 
-# Instala dependências necessárias para o projeto
+# Instala dependências Python
+ENV PATH="/opt/venv/bin:$PATH"
 COPY ./requirements.txt /tmp/requirements.txt
 
 RUN \
-    python3.12 -m pip install --upgrade pip && \
-    python3.12 -m venv /opt/venv && \
-    /opt/venv/bin/pip install --no-cache-dir -q -r /tmp/requirements.txt && \
+    python3 -m venv /opt/venv && \
+    python3 -m pip install --upgrade pip && \
+    pip install --no-cache-dir -r /tmp/requirements.txt && \
     rm -f /tmp/requirements.txt
-ENV PATH="/opt/venv/bin:$PATH"
 
+# RUN \
+#     python3.12 -m pip install --upgrade pip && \
+#     python3.12 -m venv /opt/venv && \
+#     /opt/venv/bin/pip install --no-cache-dir -q -r /tmp/requirements.txt && \
+#     rm -f /tmp/requirements.txt
+# ENV PATH="/opt/venv/bin:$PATH"
+
+# Configuração do usuário
 RUN \
-    userdel --remove ubuntu || true && \
     groupadd --gid 1000 ${MY_GROUP} || true && \
     useradd --uid 1000 --gid ${MY_GROUP} --shell /bin/bash --create-home ${MY_USERNAME} && \
     usermod -aG sudo ${MY_USERNAME} && \
     echo "${MY_USERNAME} ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/${MY_USERNAME}
 
+# RUN \
+#     userdel --remove ubuntu || true && \
+#     groupadd --gid 1000 ${MY_GROUP} || true && \
+#     useradd --uid 1000 --gid ${MY_GROUP} --shell /bin/bash --create-home ${MY_USERNAME} && \
+#     usermod -aG sudo ${MY_USERNAME} && \
+#     echo "${MY_USERNAME} ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/${MY_USERNAME}
 WORKDIR ${MY_WORKDIR}
 
-# Copie explicitamente apenas os arquivos e diretórios necessários para o build final
+# Copia binários e arquivos da aplicação
+# COPY --from=build-hadoop --chown=${MY_USERNAME}:${MY_GROUP} /home/myuser/hadoop ${HADOOP_HOME}/
+# COPY --from=build-spark --chown=${MY_USERNAME}:${MY_GROUP} /home/myuser/spark ${SPARK_HOME}/
+COPY --from=build-hadoop /opt/hadoop ${HADOOP_HOME}/
+COPY --from=build-spark /opt/spark ${SPARK_HOME}/
 COPY --chown=${MY_USERNAME}:${MY_GROUP} scripts/ ${MY_WORKDIR}/scripts/
 COPY --chown=${MY_USERNAME}:${MY_GROUP} docker/entrypoint.sh ${MY_WORKDIR}/docker/entrypoint.sh
 COPY --chown=${MY_USERNAME}:${MY_GROUP} .bash_common ${MY_WORKDIR}/.bash_common
-# Adicione outras linhas COPY conforme necessário para arquivos específicos do projeto
 
-# Copia binários preparados e depois todos os arquivos da aplicação.
-COPY --from=build-hadoop --chown=${MY_USERNAME}:${MY_GROUP} /home/myuser/hadoop ${HADOOP_HOME}/
-COPY --from=build-spark --chown=${MY_USERNAME}:${MY_GROUP} /home/myuser/spark ${SPARK_HOME}/
+# Copia o arquivo de configuração do JupyterLab
+COPY --chown=${MY_USERNAME}:${MY_GROUP} jupyter_notebook_config.py ${MY_WORKDIR}/.jupyter/jupyter_notebook_config.py
+# Cria diretório de trabalho e configura permissões
 RUN \
-    if find "${MY_WORKDIR}/scripts" -maxdepth 1 -name '*.sh' | grep -q .; then \
-      find "${MY_WORKDIR}/scripts" -maxdepth 1 -name '*.sh' -exec dos2unix -q -k {} +; \
-    fi && \
+    mkdir -p ${MY_WORKDIR}/.jupyter && \
+    mkdir -p ${MY_WORKDIR}/derby-metastore && \
+    chown -R ${MY_USERNAME}:${MY_GROUP} ${MY_WORKDIR} && \
+    chmod 755 ${MY_WORKDIR}/docker/entrypoint.sh && \
+    chmod 644 ${MY_WORKDIR}/.bash_common && \
+    chmod 644 ${MY_WORKDIR}/.jupyter/jupyter_notebook_config.py
+# Configura o diretório de trabalho e o usuário
+WORKDIR ${MY_WORKDIR}
+
+# Configurações finais, permissões e SSH
+RUN \
+    find "${MY_WORKDIR}/scripts" -name '*.sh' -exec dos2unix -q -k {} + && \
     dos2unix -q -k ${MY_WORKDIR}/docker/entrypoint.sh && \
     echo -e '\n# Carrega configurações comuns do cluster\n[ -f "${HOME}/.bash_common" ] && . "${HOME}/.bash_common"\n' >> "${MY_WORKDIR}/.bashrc" && \
-    
-    # Ativa o virtual environment automaticamente para shells interativos
     echo 'source /opt/venv/bin/activate' >> "${MY_WORKDIR}/.bashrc" && \
-
-    if [ ! -f "${MY_WORKDIR}/.ssh/id_rsa" ]; then \
-      ssh-keygen -q -t rsa -N "" -f ${MY_WORKDIR}/.ssh/id_rsa; \
-    fi && \
+    chown -R ${MY_USERNAME}:${MY_GROUP} ${HADOOP_HOME} ${SPARK_HOME} && \
+    ssh-keygen -q -t rsa -N "" -f /etc/ssh/ssh_host_rsa_key && \
+    ssh-keygen -q -t ecdsa -N "" -f /etc/ssh/ssh_host_ecdsa_key && \
+    ssh-keygen -q -t ed25519 -N "" -f /etc/ssh/ssh_host_ed25519_key && \
+    mkdir -p ${MY_WORKDIR}/.ssh && \
+    ssh-keygen -q -t rsa -N "" -f ${MY_WORKDIR}/.ssh/id_rsa && \
     cat ${MY_WORKDIR}/.ssh/id_rsa.pub >> ${MY_WORKDIR}/.ssh/authorized_keys && \
-    # Adicionado .ssh/config à configuração de permissões
+    chown -R ${MY_USERNAME}:${MY_GROUP} ${MY_WORKDIR}/.ssh && \
     chmod 0700 ${MY_WORKDIR}/.ssh && \
-    chmod 0600 ${MY_WORKDIR}/.ssh/authorized_keys ${MY_WORKDIR}/.ssh/id_rsa && \
-    chmod 0644 ${MY_WORKDIR}/.ssh/id_rsa.pub && \
-    # Cria diretório de log para o metastore do Spark SQL.
-    mkdir -p ${MY_WORKDIR}/derby-metastore
+    chmod 0600 ${MY_WORKDIR}/.ssh/authorized_keys ${MY_WORKDIR}/.ssh/id_rsa
+
+# RUN \
+#     if find "${MY_WORKDIR}/scripts" -maxdepth 1 -name '*.sh' | grep -q .; then \
+#       find "${MY_WORKDIR}/scripts" -maxdepth 1 -name '*.sh' -exec dos2unix -q -k {} +; \
+#     fi && \
+#     dos2unix -q -k ${MY_WORKDIR}/docker/entrypoint.sh && \
+#     echo -e '\n# Carrega configurações comuns do cluster\n[ -f "${HOME}/.bash_common" ] && . "${HOME}/.bash_common"\n' >> "${MY_WORKDIR}/.bashrc" && \
+    
+#     # Ativa o virtual environment automaticamente para shells interativos
+#     echo 'source /opt/venv/bin/activate' >> "${MY_WORKDIR}/.bashrc" && \
+
+#     if [ ! -f "${MY_WORKDIR}/.ssh/id_rsa" ]; then \
+#       ssh-keygen -q -t rsa -N "" -f ${MY_WORKDIR}/.ssh/id_rsa; \
+#     fi && \
+#     cat ${MY_WORKDIR}/.ssh/id_rsa.pub >> ${MY_WORKDIR}/.ssh/authorized_keys && \
+#     # Adicionado .ssh/config à configuração de permissões
+#     chmod 0700 ${MY_WORKDIR}/.ssh && \
+#     chmod 0600 ${MY_WORKDIR}/.ssh/authorized_keys ${MY_WORKDIR}/.ssh/id_rsa && \
+#     chmod 0644 ${MY_WORKDIR}/.ssh/id_rsa.pub && \
+#     # Cria diretório de log para o metastore do Spark SQL.
+#     mkdir -p ${MY_WORKDIR}/derby-metastore
 ENTRYPOINT ["${MY_WORKDIR}/docker/entrypoint.sh"]
 CMD ["bash", "${MY_WORKDIR}/scripts/bootstrap.sh", "MASTER"]
