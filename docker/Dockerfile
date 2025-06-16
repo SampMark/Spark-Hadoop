@@ -65,12 +65,13 @@ ENV HADOOP_VERSION=${HADOOP_VERSION} \
 # Instala dependências
 RUN \
     echo "Configuring APT mirror to ${APT_MIRROR}..." && \
-    cat > /etc/apt/sources.list <<EOF
-deb ${APT_MIRROR} noble main restricted universe multiverse
-deb ${APT_MIRROR} noble-updates main restricted universe multiverse
-deb ${APT_MIRROR} noble-security main restricted universe multiverse
-deb ${APT_MIRROR} noble-backports main restricted universe multiverse
-EOF
+    # Substituído 'cat <<EOF' por uma série de comandos 'echo' para maior robustez.
+    # Esta abordagem é mais segura e menos propensa a erros de sintaxe no Dockerfile.
+    echo "deb ${APT_MIRROR} noble main restricted universe multiverse" > /etc/apt/sources.list && \
+    echo "deb ${APT_MIRROR} noble-updates main restricted universe multiverse" >> /etc/apt/sources.list && \
+    echo "deb ${APT_MIRROR} noble-security main restricted universe multiverse" >> /etc/apt/sources.list && \
+    echo "deb ${APT_MIRROR} noble-backports main restricted universe multiverse" >> /etc/apt/sources.list && \
+    # Continua com a instalação dos pacotes
     apt-get update -qq && \
     apt-get install -y --no-install-recommends \
       bash \
@@ -80,6 +81,7 @@ EOF
       gnupg \
       lsb-release \
       ca-certificates && \
+    # Limpeza para reduzir o tamanho da imagem
     apt-get clean && rm -rf /var/lib/apt/lists/*
     
 # Cria diretório de trabalho
