@@ -32,7 +32,7 @@ ARG UBUNTU_VERSION=24.04
 ARG APT_MIRROR=http://archive.ubuntu.com/ubuntu
 
 ################################################################################
-# Estágio de Inicialização
+# Estágio de Inicialização (init)
 ################################################################################
 # Este estágio é responsável por configurar o ambiente inicial, baixar as
 # dependências necessárias e preparar o ambiente para os estágios de build.
@@ -41,9 +41,9 @@ ARG APT_MIRROR=http://archive.ubuntu.com/ubuntu
 FROM ubuntu:${UBUNTU_VERSION} AS init
 
 LABEL maintainer="Marcus V D Sampaio <marcus.sampaio@ifrn.edu.br>"
-LABEL description="Imagem Docker com Apache Hadoop, Apache Spark e JupyterLab para clusters de Big Data."
+LABEL description="Imagem Docker com Apache Hadoop e Spark e JupyterLab para clusters de Big Data."
 
-# Definir o SHELL como bash para suportar 'pipefail'
+# SHELL definido como bash para suportar 'pipefail'
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 # Definições de ambiente
@@ -62,13 +62,15 @@ ENV HADOOP_VERSION=${HADOOP_VERSION} \
     PATH=${HADOOP_HOME}/bin:${HADOOP_HOME}/sbin:${SPARK_HOME}/bin:${SPARK_HOME}/sbin:${JAVA_HOME}/bin:${PATH} \
     DEBIAN_FRONTEND=noninteractive
 
-# Instalações básicas e preparatórias
+# Instala dependências
 RUN \
     echo "Configuring APT mirror to ${APT_MIRROR}..." && \
-    echo "deb ${APT_MIRROR} noble main restricted universe multiverse" > /etc/apt/sources.list && \
-    echo "deb ${APT_MIRROR} noble-updates main restricted universe multiverse" >> /etc/apt/sources.list && \
-    echo "deb ${APT_MIRROR} noble-security main restricted universe multiverse" >> /etc/apt/sources.list && \
-    echo "deb ${APT_MIRROR} noble-backports main restricted universe multiverse" >> /etc/apt/sources.list && \
+    cat > /etc/apt/sources.list <<EOF
+deb ${APT_MIRROR} noble main restricted universe multiverse
+deb ${APT_MIRROR} noble-updates main restricted universe multiverse
+deb ${APT_MIRROR} noble-security main restricted universe multiverse
+deb ${APT_MIRROR} noble-backports main restricted universe multiverse
+EOF
     apt-get update -qq && \
     apt-get install -y --no-install-recommends \
       bash \
@@ -79,17 +81,24 @@ RUN \
       lsb-release \
       ca-certificates && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
+    
 # Cria diretório de trabalho
-WORKDIR /usr/local/bin
+WORKDIR /app
+# WORKDIR /usr/local/bin
 
-# Copia o script de inicialização para o contexto de build
-COPY init.sh /usr/local/bin/init.sh
+# Copia todos os arquivos e scripts necessários para o diretório de trabalho.
+COPY init.sh .
+COPY docker-compose.template.yml .
+COPY scripts/ ./scripts/
+# COPY init.sh /usr/local/bin/init.sh
 
-# Torna o script executável
-RUN chmod +x /usr/local/bin/init.sh
+# Garante que os scripts tenham permissão de execução.
+RUN chmod +x init.sh scripts/download_all.sh
+# RUN chmod +x /usr/local/bin/init.sh
 
 # Define o entrypoint para o script de inicialização
-ENTRYPOINT ["/usr/local/bin/init.sh"]
+ENTRYPOINT ["./init.sh"]
+# ENTRYPOINT ["/usr/local/bin/init.sh"]
 
 # =============================================================================
 # ESTÁGIO 1: Preparação e Validação do Hadoop
@@ -112,7 +121,7 @@ WORKDIR ${MY_WORKDIR}
 
 # Copia o tarball e o checksum do contexto de build.
 # O Dockerfile DEPENDE que esses arquivos tenham sido pré-baixados.
-COPY hadoop-3.4.1.tar.gz hadoop-3.4.1.tar.gz.sha512 ./
+COPY hadoop-${HADOOP_VERSION}.tar.gz hadoop-${HADOOP_VERSION}.tar.gz.sha512 ./
 
 # Valida, verifica o checksum e extrai. Remove a lógica de 'wget'.
 RUN \
@@ -156,7 +165,7 @@ WORKDIR ${MY_WORKDIR}
 # Copia o tarball e o checksum do contexto.
 # ATENÇÃO: Se houver mais de um arquivo que combine com o wildcard (spark-*.tar.gz ou spark-*.tar.gz.sha512),
 # o build pode falhar devido à ambiguidade. Certifique-se de que apenas UM arquivo de cada tipo esteja presente no contexto.
-COPY spark-*.tar.gz spark-*.tar.gz.sha512 ./
+COPY spark-${SPARK_VERSION}-bin-${SPARK_PROFILE}.tar.gz spark-${SPARK_VERSION}-bin-${SPARK_PROFILE}.tar.gz.sha512 ./
 
 # Valida, verifica o checksum e extrai.
 RUN \
@@ -201,7 +210,7 @@ ENV SPARK_HOME=${MY_WORKDIR}/spark
 ENV HADOOP_CONF_DIR=${HADOOP_HOME}/etc/hadoop
 ENV SPARK_CONF_DIR=${SPARK_HOME}/conf
 ENV PATH=${HADOOP_HOME}/bin:${HADOOP_HOME}/sbin:${SPARK_HOME}/bin:${SPARK_HOME}/sbin:${PATH}
-ENV JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
+ENV JAVA_HOME=/usr/lib/jvm/java-${JAVA_VERSION}-openjdk-amd64
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN \
@@ -257,8 +266,7 @@ COPY ./requirements.txt /tmp/requirements.txt
 RUN \
     python3.12 -m pip install --upgrade pip && \
     python3.12 -m venv /opt/venv && \
-    . /opt/venv/bin/activate && \
-    pip install --no-cache-dir -q -r /tmp/requirements.txt && \
+    /opt/venv/bin/pip install --no-cache-dir -q -r /tmp/requirements.txt && \
     rm -f /tmp/requirements.txt
 ENV PATH="/opt/venv/bin:$PATH"
 
@@ -279,12 +287,17 @@ COPY --chown=${MY_USERNAME}:${MY_GROUP} .bash_common ${MY_WORKDIR}/.bash_common
 
 # Copia binários preparados e depois todos os arquivos da aplicação.
 COPY --from=build-hadoop --chown=${MY_USERNAME}:${MY_GROUP} /home/myuser/hadoop ${HADOOP_HOME}/
+COPY --from=build-spark --chown=${MY_USERNAME}:${MY_GROUP} /home/myuser/spark ${SPARK_HOME}/
 RUN \
     if find "${MY_WORKDIR}/scripts" -maxdepth 1 -name '*.sh' | grep -q .; then \
       find "${MY_WORKDIR}/scripts" -maxdepth 1 -name '*.sh' -exec dos2unix -q -k {} +; \
     fi && \
     dos2unix -q -k ${MY_WORKDIR}/docker/entrypoint.sh && \
     echo -e '\n# Carrega configurações comuns do cluster\n[ -f "${HOME}/.bash_common" ] && . "${HOME}/.bash_common"\n' >> "${MY_WORKDIR}/.bashrc" && \
+    
+    # Ativa o virtual environment automaticamente para shells interativos
+    echo 'source /opt/venv/bin/activate' >> "${MY_WORKDIR}/.bashrc" && \
+
     if [ ! -f "${MY_WORKDIR}/.ssh/id_rsa" ]; then \
       ssh-keygen -q -t rsa -N "" -f ${MY_WORKDIR}/.ssh/id_rsa; \
     fi && \
