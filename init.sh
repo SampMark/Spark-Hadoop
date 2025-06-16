@@ -26,53 +26,60 @@ LIGHTBLUE_COLOR='\033[0;36m'
 RESET_COLORS='\033[0m'
 # Cores definidas de forma compatível com POSIX para garantir portabilidade.
 
-# --- Verificação de Dependências ---
-# CORREÇÃO: Verifica se 'envsubst' e 'awk' estão disponíveis no ambiente.
-check_dependencies() {
-    command -v envsubst >/dev/null 2>&1 || { log_error "envsubst não encontrado. Instale o pacote 'gettext'."; }
-    command -v awk >/dev/null 2>&1 || { log_error "awk não encontrado. Instale o pacote 'gawk' ou 'mawk'."; }
-}
-# CORREÇÃO: A função check_dependencies agora é chamada no início do script para garantir que as dependências estejam disponíveis.
-check_dependencies
-
 # --- Funções de Logging ---
 log_info() { printf "%b[INFO]%b %s\n" "${GREEN_COLOR}" "${RESET_COLORS}" "$1"; }
 log_warn() { printf "%b[WARN]%b %s\n" "${YELLOW_COLOR}" "${RESET_COLORS}" "$1"; }
 log_error() { printf "%b[ERROR]%b %s\n" "${RED_COLOR}" "${RESET_COLORS}" "$1"; exit 1; }
+
+# --- Verificação de Dependências ---
+# Verifica se 'envsubst' e 'awk' estão disponíveis no ambiente.
+check_dependencies() {
+    command -v envsubst >/dev/null 2>&1 || { log_error "envsubst não encontrado. Instale o pacote 'gettext'."; }
+    command -v awk >/dev/null 2>&1 || { log_error "awk não encontrado. Instale o pacote 'gawk' ou 'mawk'."; }
+}
 
 # --- Tratamento de Interrupção ---
 # CORREÇÃO: Garante que arquivos temporários sejam limpos se o script for interrompido.
 trap 'rm -f compose.tmp.yml; log_warn "Script interrompido pelo usuário."; exit 1' INT TERM
 
 # --- Constantes e Caminhos de Arquivos ---
-# CORREÇÃO: Centraliza a definição de caminhos para fácil manutenção.
 readonly SCRIPT_DIR="scripts"
 readonly TEMPLATE_FILE="docker-compose.template.yml"
 readonly OUTPUT_COMPOSE="docker-compose.yml"
 readonly DOWNLOAD_SCRIPT_PATH="${SCRIPT_DIR}/download_all.sh"
 
-# --- Validação das Variáveis de Ambiente Essenciais ---
-main() {
-    # 1. Valida o ambiente
-    validate_variables
-    # CORREÇÃO: A função validate_variables agora verifica se as variáveis essenciais estão definidas.
-    log_info "Iniciando processo de configuração do ambiente..."
+# --- Validação das Variáveis de Ambiente ---
+validate_variables() {
+    log_info "Validando variáveis de ambiente essenciais..."
 
+    # Verifica se as variáveis existem, falhando se estiverem ausentes.
     : "${STACK_NAME:?A variável STACK_NAME não foi definida no arquivo .env}"
     : "${IMAGE_NAME:?A variável IMAGE_NAME não foi definida no arquivo .env}"
     : "${SPARK_WORKER_INSTANCES:?A variável SPARK_WORKER_INSTANCES não foi definida no arquivo .env}"
     : "${HADOOP_VERSION:?A variável HADOOP_VERSION não foi definida no arquivo .env}"
     : "${SPARK_VERSION:?A variável SPARK_VERSION não foi definida no arquivo .env}"
 
-    # CORREÇÃO: Validação robusta para garantir que SPARK_WORKER_INSTANCES é um inteiro positivo.
-    if ! printf "%s" "${SPARK_WORKER_INSTANCES}" | grep -Eq '^[1-9][0-9]*$'; then
+    # Validação para garantir que SPARK_WORKER_INSTANCES é um inteiro positivo.
+    if ! [[ "${SPARK_WORKER_INSTANCES}" =~ ^[1-9][0-9]*$ ]]; then
         log_error "A variável SPARK_WORKER_INSTANCES deve ser um inteiro positivo (1 ou mais). Valor recebido: '${SPARK_WORKER_INSTANCES}'"
     fi
+    log_info "Variáveis de ambiente validadas com sucesso."
+}
 
-    # 2. Gera o arquivo de configuração principal
+# --- Função Principal ---
+main() {
+    # 1. Garante que as dependências (awk, envsubst) estão disponíveis
+    check_dependencies
+    
+    # 2. Valida as variáveis de ambiente do arquivo .env
+    validate_variables
+
+    log_info "Iniciando processo de configuração do ambiente..."
+
+    # 3. Gera o arquivo de configuração principal
     generate_compose_file "${SPARK_WORKER_INSTANCES}"
     
-    # 3. Decide se o download é necessário e delega a tarefa
+    # 4. Decide se o download é necessário e o executa
     download_if_needed
 
     log_info "-----------------------------------------------------"
@@ -83,42 +90,38 @@ main() {
 }
 
 # --- Função para Gerar o Arquivo docker-compose.yml ---
-# CORREÇÃO: Implementação completa usando 'envsubst' e 'awk' para uma geração robusta.
-# Esta abordagem é muito superior ao 'cat << EOF' por ser flexível e menos propensa a erros.
+# Implementação completa usando 'envsubst' e 'awk' para uma geração robusta.
+# Abordagem superior ao 'cat << EOF' por ser flexível e menos propensa a erros.
 generate_compose_file() {
     local num_workers="$1"
 
     if [ ! -f "${TEMPLATE_FILE}" ]; then
-        log_error "Arquivo de template '${TEMPLATE_FILE}' não encontrado. Não é possível gerar o docker-compose.yml."
+        log_error "Arquivo de template '${TEMPLATE_FILE}' não encontrado."
     fi
 
     log_info "Gerando '${OUTPUT_COMPOSE}' para ${YELLOW_COLOR}${num_workers}${RESET_COLORS} nó(s) worker(s)..."
 
-    # 1. Substitui as variáveis de ambiente (ex: ${STACK_NAME}) no template.
-    # As variáveis são exportadas para que envsubst possa encontrá-las.
+    # Exporta as variáveis para que 'envsubst' possa usá-las
     export STACK_NAME IMAGE_NAME SPARK_WORKER_INSTANCES HADOOP_VERSION SPARK_VERSION
     envsubst < "${TEMPLATE_FILE}" > compose.tmp.yml
 
-    # 2. Gera o bloco de configuração para os serviços de workers.
-    # Este bloco será injetado no arquivo temporário.
+    # Gera o bloco de configuração para os serviços dos workers
     worker_block=""
     i=1
     while [ "${i}" -le "${num_workers}" ]; do
-        # O 'x-common-properties' deve estar definido no seu docker-compose.template.yml
         worker_block="${worker_block}  worker-${i}:
     <<: *common-properties
     container_name: \${STACK_NAME}-worker-${i}
     hostname: \${STACK_NAME}-worker-${i}
     command: [\"WORKER\", \"${i}\"]
-" # A quebra de linha aqui é intencional
+"
         i=$((i + 1))
     done
 
-    # 3. Injeta o bloco de workers no local do marcador '## WORKER_SERVICES ##'.
-    # `awk` é perfeito para esta tarefa de substituição de texto.
+    # Injeta o bloco de workers no local do marcador '## WORKER_SERVICES ##'
     awk -v block="${worker_block}" '/## WORKER_SERVICES ##/ { print block; next } 1' compose.tmp.yml > "${OUTPUT_COMPOSE}"
 
-    # 4. Limpa o arquivo temporário.
+    # Limpa o arquivo temporário
     rm compose.tmp.yml
 
     log_info "'${OUTPUT_COMPOSE}' gerado com sucesso."
