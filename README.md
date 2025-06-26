@@ -1,4 +1,4 @@
-# ⚠️🚧👷 EM CONSTRUÇÃO 👷🚧⚠️
+### ⚠️🚧👷 EM CONSTRUÇÃO 👷🚧⚠️
 
 ---
 
@@ -18,7 +18,7 @@ O poder do Spark reside em seus componentes bem integrados, que podem ser combin
 1. **Spark Core e RDDs** é a base de toda a plataforma. 
    * **Resilient Distributed Datasets (RDDs)** é a abstração fundamental do Spark, uma coleção de elementos tolerante a falhas que pode ser operada em paralelo. Embora as APIs de alto nível como DataFrames sejam agora recomendadas, os RDDs ainda são uma parte crucial da base do Spark e oferecem controle de baixo nível quando necessário.
    As transformações em RDDs (e DataFrames) são "preguiçosas" (_lazy evaluation_), o que significa que o Spark não calcula o resultado imediatamente. Em vez disso, ele constrói um grafo de execução (DAG) e só executa os cálculos quando uma ação (como coletar os resultados) é invocada, permitindo otimizações significativas.
-2. **Spark SQL é o módulo do Spark para trabalhar com dados estruturados - 'DataFrames' e 'Datasets', são a principal API para manipulação de dados. O Spark otimiza a execução por meio do [_Catalyst_](https://www.databricks.com/glossary/catalyst-optimizer).
+2. **Spark SQL** é o módulo do Spark para trabalhar com dados estruturados - 'DataFrames' e 'Datasets', são a principal API para manipulação de dados. O Spark otimiza a execução por meio do [_Catalyst_](https://www.databricks.com/glossary/catalyst-optimizer).
    * **Motor SQL distribuído** permite executar consultas SQL diretamente em DataFrames, podendo ler e escrever dados de uma variedade de fontes de dados estruturados, como JSON, Hive, Parquet e JDBC. 
    * **Adaptive Query Execution (AQE**), é um framework que otimiza dinamicamente as consultas com base nas estatísticas de tempo de execução, ajustando o número de partições de _shuffle_ e otimizando junções (joins).
 3. **Structured Streaming** é o motor de processamento de stream tolerante a falhas e escalável do Spark, construído sobre a API do Spark SQL.
